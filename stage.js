@@ -8,7 +8,9 @@
   let view, vg, W = 0, H = 0, scale = 1;
   const skyC = document.createElement('canvas'), stC = document.createElement('canvas');
   let cur = null, last = 0, tStart = performance.now() / 1000, running = true, trans = null;
-  const listeners = new Set();
+  const listeners = new Set(), overlays = [];
+  // 部屋に入っているとき：ホストの景色・天気・時刻・乱数の種に合わせる（null なら自分の設定どおり）
+  let forced = null;
   const info = () => cur ? { id: cur.def.id, name: cur.def.name, tod: cur.env.todName, weather: cur.env.weatherName, hour: cur.env.hour } : null;
   const emit = () => listeners.forEach(f => { try { f(info()); } catch (e) {} });
 
@@ -38,6 +40,7 @@
 
   /* ---------- 時刻と天気 ---------- */
   function currentHour() {
+    if (forced && typeof forced.hour === 'number') return forced.hour;
     if (Q.get('hour')) return +Q.get('hour');
     const m = P.get('tod');
     if (m === 'clock') { const d = new Date(); return d.getHours() + d.getMinutes() / 60; }
@@ -56,7 +59,7 @@
 
   /* ---------- 場面に入る ---------- */
   function enter(def, weatherKey, keepState) {
-    const seed = keepState && cur ? cur.seed : (Math.random() * 1e9) | 0;
+    const seed = forced && forced.seed ? forced.seed : keepState && cur ? cur.seed : (Math.random() * 1e9) | 0;
     const keepS = keepState === true;
     const hour = currentHour(), env = E.makeEnv(W, H, hour, weatherKey, seed);
     const rng = RNG(seed);
@@ -69,7 +72,7 @@
     const wthr = E.makeWeather(env, RNG(seed + 4));
     const prevRand = cur && cur.randHour;
     cur = { def, env, s, rng, seed, weatherKey, clouds, wthr, randHour: keepState ? prevRand : undefined, hourBuilt: hour };
-    if (P.get('tod') === 'random' && !keepState) { cur.randHour = [6.1, 9.5, 12.5, 15, 17.9, 21, 23.5, 2][Math.random() * 8 | 0]; return enter(def, weatherKey, true); }
+    if (!forced && P.get('tod') === 'random' && !keepState) { cur.randHour = [6.1, 9.5, 12.5, 15, 17.9, 21, 23.5, 2][Math.random() * 8 | 0]; return enter(def, weatherKey, true); }
     rebuild();
     if (window.TookuPlayer) {
       const kinds = (def.amb ? def.amb(env) : []).slice();
@@ -108,7 +111,7 @@
     const dt = Math.min(0.25, last ? ts - last : 0.06); last = ts;
     const t = ts - tStart, { def, env, s } = cur;
     // 時計に合わせているときは、数分ごとに色を作り直す
-    if (P.get('tod') === 'clock' && !Q.get('hour') && Math.abs(currentHour() - cur.hourBuilt) > 0.05 && Math.abs(currentHour() - cur.hourBuilt) < 23.9) enter(def, cur.weatherKey, true);
+    if (!forced && P.get('tod') === 'clock' && !Q.get('hour') && Math.abs(currentHour() - cur.hourBuilt) > 0.05 && Math.abs(currentHour() - cur.hourBuilt) < 23.9) enter(def, cur.weatherKey, true);
     const T = E.tools(vg);
     vg.globalCompositeOperation = 'source-over'; vg.globalAlpha = 1;
     vg.drawImage(skyC, 0, 0);
@@ -121,6 +124,7 @@
     if (def.glow) { vg.save(); def.glow(vg, env, s, t, dt); vg.restore(); }
     E.drawWeather(T, env, cur.wthr, t, dt, def.wind ? def.wind(env, t) : undefined);
     if (def.over) def.over(T, env, s, t, dt);
+    for (const f of overlays) { try { f(T, env, t, dt); } catch (e) { console.warn(e); } }
     if (trans) drawTrans(ts);
   }
   // ドットがぱらぱら入れ替わる切り替え
@@ -151,7 +155,7 @@
     clearInterval(timer);
     timer = setInterval(() => {
       const min = +P.get('interval');
-      if (P.get('scene') !== 'auto' || !min || Q.get('scene')) return;
+      if (forced || P.get('scene') !== 'auto' || !min || Q.get('scene')) return;
       if (Date.now() - sceneStart > min * 60000) next();
     }, 5000);
   }
@@ -169,17 +173,31 @@
     const first = Q.get('scene') || (P.get('scene') !== 'auto' ? P.get('scene') : pickNext());
     go(first, { instant: true });
     schedule();
-    P.on('scene', () => next());
-    P.on('weather', () => { if (cur) enter(cur.def, chooseWeather(cur.def), false); });
-    P.on('tod', () => { if (cur) { cur.randHour = undefined; enter(cur.def, cur.weatherKey, true); if (P.get('tod') === 'random') enter(cur.def, cur.weatherKey, false); } });
+    P.on('scene', () => { if (!forced) next(); });
+    P.on('weather', () => { if (cur && !forced) enter(cur.def, chooseWeather(cur.def), false); });
+    P.on('tod', () => { if (cur && !forced) { cur.randHour = undefined; enter(cur.def, cur.weatherKey, true); if (P.get('tod') === 'random') enter(cur.def, cur.weatherKey, false); } });
     P.on('interval', () => { sceneStart = Date.now(); });
     requestAnimationFrame(loop);
   }
+  // 今の景色を、ほかの人に送れる形で
+  function snapshot() { return cur ? { id: cur.def.id, weather: cur.weatherKey, hour: Math.round(currentHour() * 100) / 100, seed: cur.seed } : null; }
+  // ほかの人の景色に合わせる
+  function follow(st) {
+    if (!st || !A.SCENES.some(d => d.id === st.id)) return;
+    const prev = forced; forced = { id: st.id, weather: st.weather, hour: +st.hour || 12, seed: st.seed | 0 };
+    const def = A.SCENES.find(d => d.id === st.id);
+    if (!cur || !prev || cur.def.id !== st.id || cur.weatherKey !== st.weather || cur.seed !== forced.seed) {
+      if (cur && vg) trans = { img: vg.getImageData(0, 0, W, H), t0: performance.now() / 1000, w: W, h: H };
+      enter(def, def.weather[st.weather] !== undefined ? st.weather : 'clear', false);
+    } else if (Math.abs(cur.hourBuilt - forced.hour) > 0.05) enter(def, cur.weatherKey, true);
+  }
+  function unfollow() { if (!forced) return; forced = null; sceneStart = Date.now(); if (cur) enter(cur.def, cur.weatherKey, false); }
   window.TookuStage = {
-    init, next, go, info, on: f => { listeners.add(f); return () => listeners.delete(f); },
+    init, next, go, info, snapshot, follow, unfollow, get following() { return !!forced; },
+    addOverlay: f => overlays.push(f), on: f => { listeners.add(f); return () => listeners.delete(f); },
     setRunning: v => { running = v; },
     // 確認用：時間を進めて1枚描く
     _step(seconds) { running = false; let ts = (last || performance.now() / 1000); const n = Math.max(1, Math.round(seconds * 15)); for (let i = 0; i < n; i++) { ts += 1 / 15; frame(ts, true); } },
-    get scale() { return scale; }, get size() { return [W, H]; }
+    get scale() { return scale; }, get size() { return [W, H]; }, get env() { return cur && cur.env; }
   };
 })();

@@ -46,18 +46,18 @@
   #where small { color: var(--dim); margin-left: 6px; }
 
   /* 設定 */
-  #sheet { position: fixed; z-index: 40; right: 0; top: 0; bottom: 0; width: min(420px, 100vw); padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  .sheet { position: fixed; z-index: 40; right: 0; top: 0; bottom: 0; width: min(420px, 100vw); padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
            overflow-y: auto; border-radius: 0; transform: translateX(105%); transition: transform .35s; background: rgba(12,15,30,.94); border-left: 1px solid var(--line); }
-  #sheet.open { transform: none; }
+  .sheet.open { transform: none; }
   /* 見出しと×は、下にスクロールしても上に残す */
-  #sheet h2 { font-size: 18px; font-weight: normal; display: flex; justify-content: space-between; align-items: center;
+  .sheet h2 { font-size: 18px; font-weight: normal; display: flex; justify-content: space-between; align-items: center;
               position: sticky; top: calc(-1 * max(14px, env(safe-area-inset-top))); z-index: 2; background: rgb(12,15,30);
               margin: calc(-1 * max(14px, env(safe-area-inset-top))) -16px 4px; padding: calc(max(14px, env(safe-area-inset-top)) + 6px) 16px 6px;
               border-bottom: 1px solid var(--line); }
   /* 設定の外側（左の空いているところ）。押すと閉じる */
   #shade { position: fixed; inset: 0; z-index: 39; background: rgba(4,6,16,.28); opacity: 0; pointer-events: none; transition: opacity .35s; }
   #shade.open { opacity: 1; pointer-events: auto; }
-  #sheet h3 { font-size: 13px; font-weight: normal; color: var(--accent); margin: 22px 0 8px; letter-spacing: .1em; }
+  .sheet h3 { font-size: 13px; font-weight: normal; color: var(--accent); margin: 22px 0 8px; letter-spacing: .1em; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .row .help { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; line-height: 1.5; }
   .seg { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
@@ -88,12 +88,49 @@
   .note { font-size: 12px; color: var(--dim); line-height: 1.7; margin-top: 18px; }
   .note a { color: var(--accent); }
   .x { font-size: 22px; width: 40px; height: 40px; }
+  /* みんなの窓 */
+  #people { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 5; pointer-events: none; }
+  .person { position: absolute; width: max-content; max-width: 230px; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 3px; padding-bottom: 3px; }
+  .person .nm { font-size: 11px; color: var(--ink); text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.6); white-space: nowrap; }
+  .person.me .nm { color: var(--accent); }
+  .person .bub { max-width: 220px; font-size: 12.5px; line-height: 1.45; color: #1d1a16; background: #f6f1e6; border-radius: 10px; padding: 5px 9px; box-shadow: 0 2px 6px rgba(0,0,0,.35); word-break: break-word; position: relative; }
+  .person .bub::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: #f6f1e6; }
+  body.picking #view { cursor: crosshair; }
+  body.picking #bar { opacity: .35; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .swatches button { width: 24px; height: 24px; border-radius: 6px; border: 2px solid transparent; }
+  .swatches button.on { border-color: #fff; }
+  .avbox { display: flex; gap: 12px; align-items: center; padding: 10px 0; }
+  .avbox canvas { width: 72px; height: 84px; image-rendering: pixelated; background: rgba(255,255,255,.05); border-radius: 10px; flex: none; }
+  .avbox .grow { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .btn2 { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); font-size: 13px; }
+  .btn2.main { background: var(--accent); color: #2a1a08; border-color: var(--accent); }
+  .btn2:disabled { opacity: .5; }
+  input.txt { font: inherit; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+  .code { font-size: 32px; letter-spacing: .3em; color: var(--accent); text-align: center; padding: 6px 0 2px; }
+  .muted { color: var(--dim); font-size: 12px; line-height: 1.6; }
+  .roomrow { display: flex; gap: 8px; align-items: center; padding: 8px 0; flex-wrap: wrap; }
+  #chatLog { max-height: 34vh; overflow-y: auto; font-size: 13px; line-height: 1.6; padding: 6px 2px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; min-height: 60px; }
+  #chatLog div { padding: 1px 6px; word-break: break-word; }
+  #chatLog .who { color: var(--accent); margin-right: 6px; }
+  #chatLog .me .who { color: #9fd0ff; }
+  #chatLog .sys { color: var(--dim); font-size: 12px; }
+  .tabs { display: flex; gap: 4px; margin: 4px 0 8px; }
+  .tabs button { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+  .tabs button.on { background: var(--accent); color: #2a1a08; border-color: var(--accent); }
+  .explain { font-size: 13px; line-height: 1.8; color: var(--ink); }
+  .explain p { margin: 0 0 8px; } .explain ul { margin: 0 0 8px; padding-left: 18px; } .explain li { margin-bottom: 4px; }
+  .explain code { font-size: 12px; background: rgba(255,255,255,.08); padding: 1px 4px; border-radius: 4px; }
+  .dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #ff7a6a; display: none; }
+  #bRoom { position: relative; }
+  #bRoom.unread .dot { display: block; }
   #toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 50; padding: 8px 14px; font-size: 13px; opacity: 0; transition: opacity .4s; pointer-events: none; }
   #toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 <canvas id="view" aria-label="ドット絵の景色"></canvas>
+<div id="people"></div>
 
 <div id="where" class="hide"></div>
 
@@ -111,11 +148,12 @@
   <button class="btn" id="bNext" aria-label="次の曲">⏭</button>
   <div class="np"><div class="t" id="nT">準備しています…</div><div class="s" id="nS"></div><div class="l" id="nL"></div><div id="prog"><i></i></div></div>
   <button class="btn" id="bScene" aria-label="次の景色">🖼</button>
+  <button class="btn" id="bRoom" aria-label="みんなの窓">👥<i class="dot"></i></button>
   <button class="btn" id="bSet" aria-label="設定">⚙</button>
 </div>
 
 <div id="shade"></div>
-<div id="sheet" aria-label="設定">
+<div id="sheet" class="sheet" aria-label="設定">
   <h2>設定 <button class="x" id="bClose" aria-label="閉じる">×</button></h2>
 
   <h3>音</h3>
@@ -148,6 +186,60 @@
     設定はこの端末のブラウザだけに保存されます。
   </div>
 </div>
+<div id="room" class="sheet" aria-label="みんなの窓">
+  <h2>みんなの窓 <button class="x" id="rClose" aria-label="閉じる">×</button></h2>
+
+  <h3>アバター</h3>
+  <div class="row"><div>アバターを出す<span class="help">作りたい人だけ。景色の好きな場所に置けます</span></div><button class="switch" id="avOn" aria-label="アバターを出す"></button></div>
+  <div class="avbox">
+    <canvas id="avPrev" width="24" height="28"></canvas>
+    <div class="grow">
+      <input class="txt" id="avName" maxlength="12" placeholder="名前（12文字まで）" autocomplete="off">
+      <button class="btn2" id="avPlace">置く場所を選ぶ</button>
+    </div>
+  </div>
+  <div class="row"><div>髪型</div><div class="seg" id="avHair"></div></div>
+  <div class="row"><div>髪の色</div><div class="swatches" id="avHc"></div></div>
+  <div class="row"><div>肌</div><div class="swatches" id="avSkin"></div></div>
+  <div class="row"><div>服</div><div class="swatches" id="avCloth"></div></div>
+  <div class="row"><div style="white-space:nowrap">すること</div><div class="seg" id="avAct"></div></div>
+
+  <h3>部屋</h3>
+  <div id="roomOut">
+    <p class="muted">部屋を作ると4文字の番号ができます。友だちがその番号で入ると、同じ景色の中にアバターが並び、チャットできます。曲はそれぞれの端末で流れます。</p>
+    <div class="roomrow"><button class="btn2 main" id="rHost">部屋を作る</button></div>
+    <div class="roomrow"><input class="txt" id="rCode" maxlength="4" placeholder="番号" autocapitalize="characters" autocomplete="off" style="width:96px;text-transform:uppercase;letter-spacing:.2em"><button class="btn2" id="rJoin">番号で入る</button></div>
+  </div>
+  <div id="roomIn" style="display:none">
+    <div class="code" id="rCodeShow"></div>
+    <p class="muted" id="rInfo" style="text-align:center"></p>
+    <div id="chatLog" aria-live="polite"></div>
+    <div class="roomrow"><input class="txt" id="rMsg" maxlength="80" placeholder="ひとこと（80文字まで）" autocomplete="off" style="flex:1"><button class="btn2 main" id="rSend">送る</button></div>
+    <div class="roomrow"><button class="btn2" id="rLeave">部屋を出る</button></div>
+  </div>
+  <p class="muted" id="rBusy"></p>
+
+  <h3>つながり方の説明</h3>
+  <div class="tabs"><button data-ex="easy" class="on">かんたん</button><button data-ex="pro">くわしく</button></div>
+  <div class="explain" id="exEasy">
+    <p>部屋を作ると、4文字の番号（合言葉）ができます。友だちがその番号を入れると、おたがいのブラウザが<b>直接</b>つながります。</p>
+    <p>直接つながるまでの「待ち合わせ」だけ、無料の案内所（PeerJS のサーバー）を使います。つながったあとは、アバターの場所や話したことは、案内所を通らずに相手へ届きます。回線によって直接つながれないときは、PeerJS の中継所を通ります（そのときも中身は暗号化されています）。</p>
+    <p>話したことはどこにも保存されません。部屋を出ると消えます。</p>
+    <p><b>気をつけること：</b>直接つながるしくみなので、同じ部屋の人どうしには、おたがいの IP アドレス（ネット上の住所のようなもの）が伝わります。番号は知っている人とだけ共有してください。</p>
+    <p>部屋を作った人（ホスト）が画面を閉じたり、部屋を出たりすると、部屋はなくなります。</p>
+  </div>
+  <div class="explain" id="exPro" style="display:none">
+    <ul>
+      <li><b>通信</b>：WebRTC のデータチャネル。中身は DTLS で暗号化されます。ライブラリは PeerJS 1.5.5（MIT ライセンス、unpkg から読み込み）。部屋の機能を開くまでは読み込みません。</li>
+      <li><b>シグナリング</b>：接続情報（SDP と ICE 候補）の交換に、PeerJS の公開サーバー <code>0.peerjs.com</code> を使います。ホストは部屋の番号から決まる ID（<code>tooku-no-mado-XXXX</code>）で登録し、ゲストはその ID へ接続を申し込みます。</li>
+      <li><b>NAT 越え</b>：PeerJS の既定の設定どおり、STUN（<code>stun.l.google.com</code>）で直接の経路を探し、だめなときは PeerJS の TURN サーバーで中継します。</li>
+      <li><b>形</b>：スター型。ホストが全員とつながり、届いたものをほかの人へ配ります。最大 8 人。ホストが抜けると部屋は終わります。</li>
+      <li><b>送るもの</b>：アバターの見た目と位置（画面に対する割合 0〜1）、チャット（80文字まで）、ホストの景色・天気・時刻・乱数の種（同じ景色を描くため）。曲や音は送りません。</li>
+      <li><b>受け取ったものの扱い</b>：ホストは送り主を接続相手で見分け、値の種類と長さを確かめてから配ります。送る回数にも上限があります。画面には文字としてだけ表示します（HTML として解釈しません）。</li>
+      <li><b>IP アドレス</b>：ICE 候補にはグローバル IP アドレスが含まれるため、同じ部屋の人には見えます。会話の記録は各端末のメモリの中だけで、保存も送信もしません。</li>
+    </ul>
+  </div>
+</div>
 <div id="toast" class="glass"></div>
 
 <script src="prefs.js"></script>
@@ -161,6 +253,8 @@
 <script src="scenes-b.js"></script>
 <script src="scenes-c.js"></script>
 <script src="stage.js"></script>
+<script src="avatar.js"></script>
+<script src="room.js"></script>
 <script>
 (function () {
   'use strict';
@@ -184,7 +278,7 @@
   function poke() {
     if (!started) return;
     $('bar').classList.remove('hide'); if (P.get('info')) $('where').classList.remove('hide');
-    clearTimeout(hideT); hideT = setTimeout(() => { if (!$('sheet').classList.contains('open')) { $('bar').classList.add('hide'); $('where').classList.add('hide'); } }, 4500);
+    clearTimeout(hideT); hideT = setTimeout(() => { if (!document.querySelector('.sheet.open')) { $('bar').classList.add('hide'); $('where').classList.add('hide'); } }, 4500);
   }
   ['pointerdown', 'mousemove', 'keydown'].forEach(ev => window.addEventListener(ev, poke, { passive: true }));
   $('bar').addEventListener('pointerdown', e => e.stopPropagation());
@@ -193,13 +287,13 @@
   $('bNext').onclick = () => PL.skip();
   $('bPrev').onclick = () => PL.prev();
   $('bScene').onclick = () => { ST.next(); };
-  const openSheet = () => { $('sheet').classList.add('open'); $('shade').classList.add('open'); renderSongs(); };
-  const closeSheet = () => { $('sheet').classList.remove('open'); $('shade').classList.remove('open'); poke(); };
+  const openSheet = () => { $('room').classList.remove('open'); $('sheet').classList.add('open'); $('shade').classList.add('open'); renderSongs(); };
+  const closeSheet = () => { $('sheet').classList.remove('open'); $('room').classList.remove('open'); $('shade').classList.remove('open'); poke(); };
   $('bSet').onclick = openSheet;
   $('bClose').onclick = closeSheet;
   $('shade').addEventListener('click', closeSheet);
   window.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
     if (e.code === 'Space') { e.preventDefault(); started ? PL.toggle() : start(); }
     if (e.key === 'n' || e.key === 'ArrowRight') PL.skip();
     if (e.key === 's') ST.next();
@@ -281,6 +375,77 @@
     toast(v ? '表示が必要な曲（CC）も流します' : '表示が必要な曲（CC）は流しません'); renderSongs();
   });
   P.on('mode', v => toast(v === 'bg' ? 'バックグラウンド再生にしました（曲の用意に少し時間がかかります）' : 'ふつうの再生にしました'));
+
+  /* ---------- みんなの窓 ---------- */
+  const AV = window.TookuAvatar, RM = window.TookuRoom;
+  const av = () => AV.mine();
+  const setAv = patch => P.set('av', Object.assign(av(), patch));
+  const openRoom = () => { $('sheet').classList.remove('open'); $('room').classList.add('open'); $('shade').classList.add('open'); $('bRoom').classList.remove('unread'); syncAv(); renderRoom(RM.state()); };
+  $('bRoom').onclick = openRoom;
+  $('rClose').onclick = closeSheet;
+  // 見た目の選択肢
+  $('avHair').innerHTML = AV.HAIR_NAME.map((n, i) => `<button data-v="${i}">${n}</button>`).join('');
+  $('avAct').innerHTML = Object.entries(AV.ACTS).map(([k, n]) => `<button data-v="${k}">${n}</button>`).join('');
+  [['avHc', 'hair', 'hc'], ['avSkin', 'skin', 'skin'], ['avCloth', 'cloth', 'cloth']].forEach(([id, pal, key]) => {
+    $(id).innerHTML = AV.PAL[pal].map((c, i) => `<button data-v="${i}" style="background:${c}" aria-label="色${i + 1}"></button>`).join('');
+    $(id).onclick = e => { const b = e.target.closest('button'); if (b) { setAv({ [key]: +b.dataset.v, on: true }); syncAv(); } };
+  });
+  $('avHair').onclick = e => { const b = e.target.closest('button'); if (b) { setAv({ hair: +b.dataset.v, on: true }); syncAv(); } };
+  $('avAct').onclick = e => { const b = e.target.closest('button'); if (b) { setAv({ act: b.dataset.v, on: true }); syncAv(); } };
+  $('avOn').onclick = () => { setAv({ on: !av().on }); syncAv(); };
+  $('avName').oninput = () => setAv({ name: $('avName').value });
+  $('avPlace').onclick = () => {
+    setAv({ on: true }); closeSheet();
+    toast('アバターを置きたい場所をタップしてください');
+    AV.pick((x, y) => { setAv({ x, y }); toast('ここに置きました'); });
+  };
+  function syncAv() {
+    const a = av();
+    $('avOn').classList.toggle('on', a.on);
+    if (document.activeElement !== $('avName')) $('avName').value = a.name;
+    $('avHair').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === a.hair));
+    $('avAct').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === a.act));
+    $('avHc').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === a.hc));
+    $('avSkin').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === a.skin));
+    $('avCloth').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === a.cloth));
+  }
+  setInterval(() => { if ($('room').classList.contains('open')) AV.preview($('avPrev'), av(), performance.now() / 1000); }, 150);
+  // 部屋
+  const busy = async (f) => { try { await f(); } catch (e) { toast(e.message || String(e)); } };
+  $('rHost').onclick = () => busy(() => RM.host());
+  $('rJoin').onclick = () => busy(() => RM.join($('rCode').value));
+  $('rCode').onkeydown = e => { if (e.key === 'Enter') $('rJoin').click(); };
+  $('rLeave').onclick = () => { RM.leave(); toast('部屋を出ました'); };
+  const sendMsg = () => { if (RM.chat($('rMsg').value)) $('rMsg').value = ''; };
+  $('rSend').onclick = sendMsg;
+  $('rMsg').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendMsg(); } };
+  document.querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-ex]').forEach(x => x.classList.toggle('on', x === b));
+    $('exEasy').style.display = b.dataset.ex === 'easy' ? '' : 'none'; $('exPro').style.display = b.dataset.ex === 'pro' ? '' : 'none';
+  });
+  let logLen = -1;
+  function renderRoom(st) {
+    $('roomOut').style.display = st.role ? 'none' : ''; $('roomIn').style.display = st.role ? '' : 'none';
+    $('rBusy').textContent = st.busy; $('rHost').disabled = $('rJoin').disabled = !!st.busy;
+    if (!st.role && RM.lastCode && !$('rCode').value) $('rCode').value = RM.lastCode;
+    if (!st.role) { logLen = -1; return; }
+    $('rCodeShow').textContent = st.code;
+    const names = st.names.map(([, a]) => a.name || 'ななし');
+    $('rInfo').textContent = (st.role === 'host' ? 'あなたがホストです。この番号を友だちに伝えてください' : 'ホストの景色に合わせています') + '・' + st.count + '人' + (names.length ? '（' + names.join('、') + '）' : '');
+    if (st.log.length !== logLen) {
+      logLen = st.log.length; const box = $('chatLog'); box.textContent = '';
+      for (const m of st.log) {
+        const d = document.createElement('div');
+        if (m.sys) { d.className = 'sys'; d.textContent = m.text; }
+        else { d.className = m.me ? 'me' : ''; const w = document.createElement('span'); w.className = 'who'; w.textContent = m.me ? (m.name || 'あなた') : m.name; d.append(w, document.createTextNode(m.text)); }
+        box.appendChild(d);
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+  RM.on(renderRoom);
+  window.addEventListener('tooku-toast', e => toast(e.detail));
+  window.addEventListener('tooku-chat', e => { if (!e.detail.sys && !$('room').classList.contains('open')) $('bRoom').classList.add('unread'); });
 })();
 </script>
 </body>
