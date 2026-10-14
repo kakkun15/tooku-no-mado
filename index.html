@@ -49,7 +49,14 @@
   #sheet { position: fixed; z-index: 40; right: 0; top: 0; bottom: 0; width: min(420px, 100vw); padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
            overflow-y: auto; border-radius: 0; transform: translateX(105%); transition: transform .35s; background: rgba(12,15,30,.94); border-left: 1px solid var(--line); }
   #sheet.open { transform: none; }
-  #sheet h2 { font-size: 18px; font-weight: normal; margin: 6px 0 4px; display: flex; justify-content: space-between; align-items: center; }
+  /* 見出しと×は、下にスクロールしても上に残す */
+  #sheet h2 { font-size: 18px; font-weight: normal; display: flex; justify-content: space-between; align-items: center;
+              position: sticky; top: calc(-1 * max(14px, env(safe-area-inset-top))); z-index: 2; background: rgb(12,15,30);
+              margin: calc(-1 * max(14px, env(safe-area-inset-top))) -16px 4px; padding: calc(max(14px, env(safe-area-inset-top)) + 6px) 16px 6px;
+              border-bottom: 1px solid var(--line); }
+  /* 設定の外側（左の空いているところ）。押すと閉じる */
+  #shade { position: fixed; inset: 0; z-index: 39; background: rgba(4,6,16,.28); opacity: 0; pointer-events: none; transition: opacity .35s; }
+  #shade.open { opacity: 1; pointer-events: auto; }
   #sheet h3 { font-size: 13px; font-weight: normal; color: var(--accent); margin: 22px 0 8px; letter-spacing: .1em; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .row .help { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; line-height: 1.5; }
@@ -67,9 +74,17 @@
   .song { display: flex; align-items: center; gap: 10px; padding: 7px 2px; font-size: 13.5px; border-bottom: 1px solid rgba(255,255,255,.06); }
   .song input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
   .song .nm { flex: 1; min-width: 0; }
-  .song .nm small { color: var(--dim); margin-left: 6px; }
+  .song .nm small { color: var(--dim); margin-left: 6px; display: inline-block; }
   .song .play { font-size: 12px; color: var(--accent); padding: 4px 6px; flex: none; }
   .song.cur .nm { color: var(--accent); }
+  .song.muted .nm { opacity: .4; }
+  .song .lic { font-size: 10.5px; color: var(--dim); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; margin-left: 6px; white-space: nowrap; vertical-align: 1px; }
+  .song .lic.on { color: var(--accent); border-color: var(--accent); }
+  .licinfo { display: none; font-size: 12px; color: var(--dim); line-height: 1.7; padding: 6px 4px 10px 30px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .licinfo.open { display: block; }
+  .licinfo a { color: var(--accent); }
+  #bar .l { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none; }
+  #bar .l.on { display: block; }
   .note { font-size: 12px; color: var(--dim); line-height: 1.7; margin-top: 18px; }
   .note a { color: var(--accent); }
   .x { font-size: 22px; width: 40px; height: 40px; }
@@ -94,11 +109,12 @@
   <button class="btn" id="bPrev" aria-label="前の曲">⏮</button>
   <button class="btn" id="bPlay" aria-label="再生・一時停止">▶</button>
   <button class="btn" id="bNext" aria-label="次の曲">⏭</button>
-  <div class="np"><div class="t" id="nT">準備しています…</div><div class="s" id="nS"></div><div id="prog"><i></i></div></div>
+  <div class="np"><div class="t" id="nT">準備しています…</div><div class="s" id="nS"></div><div class="l" id="nL"></div><div id="prog"><i></i></div></div>
   <button class="btn" id="bScene" aria-label="次の景色">🖼</button>
   <button class="btn" id="bSet" aria-label="設定">⚙</button>
 </div>
 
+<div id="shade"></div>
 <div id="sheet" aria-label="設定">
   <h2>設定 <button class="x" id="bClose" aria-label="閉じる">×</button></h2>
 
@@ -108,6 +124,7 @@
   <div class="row"><div>ゆったり再生<span class="help">テンポを少し落とします</span></div><button class="switch" data-switch="slow" aria-label="ゆったり再生"></button></div>
   <div class="row"><div>曲の音量</div><input type="range" min="0" max="100" data-range="vol"></div>
   <div class="row"><div>環境音<span class="help">焚き火・川・風・雨など</span></div><input type="range" min="0" max="100" data-range="amb"></div>
+  <div class="row"><div>表示が必要な曲も流す<span class="help">クリエイティブ・コモンズ（CC）の曲です。録画や配信のときにオフにすると、表示のいらない曲だけが流れます</span></div><button class="switch" data-switch="cc" aria-label="表示が必要な曲も流す"></button></div>
   <div class="row"><div>曲の順番</div><div class="seg" data-pref="order" data-opts="shuffle:シャッフル,seq:順番"></div></div>
 
   <h3>景色</h3>
@@ -125,7 +142,9 @@
   <div class="songs" id="songs"></div>
 
   <div class="note">
-    曲はすべて作曲者の没後80年以上が過ぎた作品です。録音は使わず、楽譜の音符から音をその場で合成しています。出典は <a href="https://github.com/kakkun15/tooku-no-mado#曲と権利について" target="_blank" rel="noopener">README</a> に書いてあります。<br>
+    曲はすべて作曲者の没後80年以上が過ぎた作品です。録音は使わず、楽譜の音符から音をその場で合成しています。<br>
+    「CC」の印がある曲は、楽譜を入力した人の表示が必要な曲です。印を押すと、入力した人とライセンスが出ます。<br>
+    出典は <a href="https://github.com/kakkun15/tooku-no-mado#曲と権利について" target="_blank" rel="noopener">README</a> に書いてあります。<br>
     設定はこの端末のブラウザだけに保存されます。
   </div>
 </div>
@@ -133,6 +152,7 @@
 
 <script src="prefs.js"></script>
 <script src="music.js"></script>
+<script src="music-cc.js"></script>
 <script src="synth.js"></script>
 <script src="player.js"></script>
 <script src="engine.js"></script>
@@ -173,14 +193,17 @@
   $('bNext').onclick = () => PL.skip();
   $('bPrev').onclick = () => PL.prev();
   $('bScene').onclick = () => { ST.next(); };
-  $('bSet').onclick = () => { $('sheet').classList.add('open'); renderSongs(); };
-  $('bClose').onclick = () => { $('sheet').classList.remove('open'); poke(); };
+  const openSheet = () => { $('sheet').classList.add('open'); $('shade').classList.add('open'); renderSongs(); };
+  const closeSheet = () => { $('sheet').classList.remove('open'); $('shade').classList.remove('open'); poke(); };
+  $('bSet').onclick = openSheet;
+  $('bClose').onclick = closeSheet;
+  $('shade').addEventListener('click', closeSheet);
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (e.code === 'Space') { e.preventDefault(); started ? PL.toggle() : start(); }
     if (e.key === 'n' || e.key === 'ArrowRight') PL.skip();
     if (e.key === 's') ST.next();
-    if (e.key === 'Escape') $('sheet').classList.remove('open');
+    if (e.key === 'Escape') closeSheet();
   });
 
   /* ---------- 再生中の表示 ---------- */
@@ -190,6 +213,9 @@
     if (st.loading && !st.piece) { $('nT').textContent = '曲を用意しています…'; $('nS').textContent = ''; }
     else if (st.piece) { $('nT').textContent = st.piece.t; $('nS').textContent = st.piece.c + '・' + st.familyName + (st.loading ? '・次を用意中…' : ''); }
     if (st.piece && st.piece.id !== curId) { curId = st.piece.id; markCur(); }
+    const lic = st.piece && st.piece.lic ? PL.LICENSES[st.piece.lic] : null;
+    $('nL').textContent = lic ? lic.name + '・楽譜の入力：' + st.piece.by + '（Mutopia Project）' : '';
+    $('nL').classList.toggle('on', !!lic);
   });
   setInterval(() => { const st = PL.state(); $('prog').firstElementChild.style.width = st.dur ? Math.min(100, st.pos / st.dur * 100) + '%' : '0'; }, 500);
   ST.on(i => { if (!i) return; $('where').innerHTML = i.name + '<small>' + i.tod + '・' + i.weather + '</small>'; });
@@ -218,18 +244,27 @@
     const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     box.innerHTML = Object.entries(groups).map(([g, list]) => `
       <div class="grp"><span>${PL.GROUP_NAME[g] || g}（${list.length}曲）</span><span><button data-all="${g}" data-on="1">全部オン</button> ・ <button data-all="${g}" data-on="0">全部オフ</button></span></div>
-      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}<small>${p.c}・${fmt(p.s)}</small></span><button class="play" data-play="${p.id}">流す</button></label>`).join('')}`).join('');
+      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span><button class="play" data-play="${p.id}">流す</button></label>${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
+  }
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function licInfo(p) {
+    const L = PL.LICENSES[p.lic];
+    return `<div class="licinfo" id="li-${p.id}">楽譜の入力：${esc(p.by)}（<a href="${p.src}" target="_blank" rel="noopener">Mutopia Project の楽譜</a>）<br>
+      ライセンス：<a href="${L.url}" target="_blank" rel="noopener">${L.name}</a><br>
+      変更：楽譜を MIDI にして繰り返しを展開し、音符の並びに変換${p.note ? '。' + esc(p.note) : ''}<br>
+      この曲の音符データ（music-cc.js）も同じライセンスで公開しています</div>`;
   }
   function markCur() { document.querySelectorAll('.song').forEach(el => el.classList.toggle('cur', el.dataset.id === curId)); }
   $('songs').addEventListener('click', e => {
-    const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); PL.playPiece(pl.dataset.play); return; }
+    const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); if (!PL.allowed(PL.PIECES.find(p => p.id === pl.dataset.play))) { toast('「表示が必要な曲も流す」がオフになっています'); return; } PL.playPiece(pl.dataset.play); return; }
+    const lb = e.target.closest('[data-lic]'); if (lb) { e.preventDefault(); const box = $('li-' + lb.dataset.lic); box.classList.toggle('open'); lb.classList.toggle('on', box.classList.contains('open')); return; }
     const all = e.target.closest('[data-all]');
     if (all) { const g = all.dataset.all, on = all.dataset.on === '1', off = new Set(P.get('off') || []); PL.PIECES.filter(p => p.g === g).forEach(p => on ? off.delete(p.id) : off.add(p.id)); P.set('off', [...off]); renderSongs(); }
   });
   $('songs').addEventListener('change', e => {
     const lab = e.target.closest('.song'); if (!lab) return; const off = new Set(P.get('off') || []);
     e.target.checked ? off.delete(lab.dataset.id) : off.add(lab.dataset.id);
-    if (off.size >= PL.PIECES.length) { off.delete(lab.dataset.id); e.target.checked = true; toast('1曲は残してください'); }
+    if (!PL.PIECES.some(p => !off.has(p.id) && PL.allowed(p))) { off.delete(lab.dataset.id); e.target.checked = true; toast('1曲は残してください'); }
     P.set('off', [...off]);
   });
 
@@ -241,6 +276,10 @@
   P.on('wake', wake); document.addEventListener('visibilitychange', wake);
   $('bFull').onclick = () => { const d = document; try { if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d); else { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen).call(el); } } catch (e) { toast('このブラウザでは全画面にできません。ホーム画面に追加すると全画面で開けます'); } };
   function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2600); }
+  P.on('cc', v => {
+    if (!v && !PL.enabledIds().length) { P.set('cc', true); document.querySelector('[data-switch=cc]').classList.add('on'); toast('ほかに流せる曲がないので、オフにできません'); return; }
+    toast(v ? '表示が必要な曲（CC）も流します' : '表示が必要な曲（CC）は流しません'); renderSongs();
+  });
   P.on('mode', v => toast(v === 'bg' ? 'バックグラウンド再生にしました（曲の用意に少し時間がかかります）' : 'ふつうの再生にしました'));
 })();
 </script>

@@ -12,8 +12,22 @@
   const info = () => cur ? { id: cur.def.id, name: cur.def.name, tod: cur.env.todName, weather: cur.env.weatherName, hour: cur.env.hour } : null;
   const emit = () => listeners.forEach(f => { try { f(info()); } catch (e) {} });
 
+  // 画面いっぱいの大きさを測る。iPad などでは innerHeight が実際より短いまま残ることがあり、
+  // 景色の下に帯ができていた。画面全体（100lvh）の箱も測って、大きいほうに合わせる
+  let probe = null;
+  function screenSize() {
+    if (!probe) {
+      probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;height:100lvh;visibility:hidden;pointer-events:none;z-index:-1';
+      document.body.appendChild(probe);
+    }
+    const r = probe.getBoundingClientRect(), vv = window.visualViewport;
+    const w = Math.max(window.innerWidth, document.documentElement.clientWidth, r.width, vv ? vv.width * vv.scale : 0);
+    const h = Math.max(window.innerHeight, document.documentElement.clientHeight, r.height, vv ? vv.height * vv.scale : 0);
+    return [Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h))];
+  }
   function fit() {
-    const cw = Math.max(1, window.innerWidth), ch = Math.max(1, window.innerHeight);
+    const [cw, ch] = screenSize();
     // 短い辺が 110〜140 ドットくらいになる、ちょうどの倍率
     const target = Q.get('px') ? +Q.get('px') : 124;
     scale = Math.max(2, Math.round(Math.min(cw, ch) / target));
@@ -144,7 +158,14 @@
 
   function init(canvas) {
     view = canvas; fit();
-    window.addEventListener('resize', () => { clearTimeout(fit._t); fit._t = setTimeout(fit, 120); });
+    const refit = () => { clearTimeout(fit._t); fit._t = setTimeout(fit, 120); };
+    window.addEventListener('resize', refit);
+    window.addEventListener('orientationchange', () => { refit(); setTimeout(fit, 600); });
+    window.addEventListener('pageshow', refit);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { refit(); setTimeout(fit, 700); } });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', refit);
+    // 大きさの通知が来ないまま変わることもあるので、ときどき確かめる（ずれていなければ何もしない）
+    setInterval(() => { const [cw, ch] = screenSize(); if (Math.ceil(cw / scale) !== W || Math.ceil(ch / scale) !== H) fit(); }, 1500);
     const first = Q.get('scene') || (P.get('scene') !== 'auto' ? P.get('scene') : pickNext());
     go(first, { instant: true });
     schedule();

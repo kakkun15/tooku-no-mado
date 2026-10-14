@@ -3,7 +3,7 @@
 ドット絵の景色を眺めながら、著作権の切れた曲をずっと流し続けるWebページです。
 [終末ニュース](https://github.com/kakkun15/shuumatsu-news) の派生で、こちらは怖がらせる側ではなく、落ち着く側の窓です。
 
-- 曲は 94 曲（約232分）。録音は使わず、楽譜の音符からブラウザの中で音を作ります
+- 曲は 102 曲（約260分）。うち8曲は、楽譜を入力した人の表示が必要な曲（Creative Commons）です。録音は使わず、楽譜の音符からブラウザの中で音を作ります
 - 音色は「やさしい」「オルゴール」「ファミコン」から選べます（おまかせなら曲ごとに変わります）
 - 景色は12か所。時間帯（時計に合わせる／朝・昼・夕方・夜）と天気（晴れ・くもり・雨・雪・霧）で見た目が変わります
 - 景色ごとに焚き火・川・風・波などの環境音が鳴ります
@@ -32,7 +32,7 @@
 
 - ⏮ ▶ ⏭：前の曲・再生／一時停止・次の曲
 - 🖼：次の景色へ
-- ⚙：設定（音色、再生のしかた、時間帯、天気、流す曲の選択など）
+- ⚙：設定（音色、再生のしかた、時間帯、天気、流す曲の選択など）。設定の外側（左の空いているところ）を押すと閉じます
 - キーボード：スペースで再生／一時停止、→ か n で次の曲、s で次の景色
 
 スマホではブラウザの「ホーム画面に追加」から開くと全画面になります。
@@ -55,7 +55,8 @@
 | ファイル | 中身 |
 | --- | --- |
 | `index.html` | 画面と操作 |
-| `music.js` | 曲の音符データ（開始・長さ・音の高さ・役割と強さ） |
+| `music.js` | 曲の音符データ（開始・長さ・音の高さ・役割と強さ）。Public Domain の曲だけ |
+| `music-cc.js` | 表示が必要な曲（Creative Commons）の音符データ。元の楽譜のライセンスを引き継ぐ |
 | `synth.js` | 音の合成。Web Worker の中で動く |
 | `player.js` | 再生（ふつう／バックグラウンド）、選曲、環境音 |
 | `engine.js` | 空・時間帯・天気・光などの描画の土台 |
@@ -68,9 +69,9 @@
 
 ## 曲と権利について
 
-- 録音は一切含みません。`music.js` に入っているのは音符の並びだけで、音はブラウザの中で合成しています。
+- 録音は一切含みません。`music.js` と `music-cc.js` に入っているのは音符の並びだけで、音はブラウザの中で合成しています。
 - 曲そのものは、すべて作曲者の没後80年以上が過ぎた作品か、作者不詳の古い民謡です。
-- 曲の著作権が切れていても、楽譜の入力データには入力した人の権利が残ることがあります。そのため、新しく足した曲は [Mutopia Project](https://www.mutopiaproject.org/) のうち、入力者が **Public Domain と明記した楽譜**だけを使いました（同じ曲でも Creative Commons 表示のものは使っていません）。Mutopia の説明では、Public Domain の楽譜は印刷・変更・配布・演奏を制限なく行えます（<https://www.mutopiaproject.org/legal.html>）。
+- 曲の著作権が切れていても、楽譜の入力データには入力した人の権利が残ることがあります。そのため、`music.js` の曲は [Mutopia Project](https://www.mutopiaproject.org/) のうち、入力者が **Public Domain と明記した楽譜**だけを使いました。Creative Commons の楽譜から作った曲は `music-cc.js` に分けています（下の「表示が必要な曲」）。Mutopia の説明では、Public Domain の楽譜は印刷・変更・配布・演奏を制限なく行えます（<https://www.mutopiaproject.org/legal.html>）。
 - 楽譜（LilyPond 形式）を LilyPond 2.25 で MIDI に変換し、繰り返しを展開してから音符データにしました。古い書式で変換できなかった部分は、音に関係しない見た目の指定（強弱の文字、ページの飾りなど）だけを外しています。
 - 楽譜を入力・公開してくださった方々に感謝します。
 
@@ -191,6 +192,23 @@
 
 「月光 第1楽章」はタレガがギター用に編曲した版です（タレガは1909年没）。
 
-### 入れなかった曲
+### 表示が必要な曲（Creative Commons）
 
-「月光」のピアノ版、「ノクターン 第2番」、「美しく青きドナウ」、「新世界より 第2楽章」、「カノン（原曲の全声部）」、「グノシエンヌ 第1番」、「ゴルトベルク変奏曲 アリア」などは、Mutopia の楽譜が Creative Commons（表示が必要なライセンス）だったため、今は入れていません。表示を付ければ使えるので、入れるかどうかは後で決められます。
+この8曲は、Mutopia Project の楽譜のうち、入力者が Creative Commons のライセンスで公開しているものから作りました。使うには、入力者の名前とライセンスを表示する必要があります。
+
+- 画面では、曲の一覧で曲名の横に「CC BY-SA 3.0」などの印が出ます。印を押すと、入力者・ライセンス・元の楽譜へのリンク・加えた変更が出ます。再生中は、曲名の下に小さく入力者とライセンスが出ます。
+- 設定の「表示が必要な曲も流す」をオフにすると、この8曲は流れません（流している途中なら、すぐ次の曲に移ります）。録画や配信で表示を入れられないときに使ってください。
+- 変更点：どの曲も、楽譜（LilyPond 形式）を LilyPond 2.25 で MIDI に変換し、繰り返しを展開して、音符の並び（開始・長さ・音の高さ・役割と強さ）にしました。「家路」は下の表のとおり抜粋です。
+- BY-SA（継承）の曲は、変換したデータも同じライセンスで公開する条件があります。そのため `music-cc.js` の音符データは、各曲の元のライセンスのまま公開しています。ほかのファイル（再生のしくみ・景色・Public Domain の曲）には、これらのライセンスはかかりません。
+- 録画した音を公開するときも、下の表の入力者とライセンスを書いてください。
+
+| 曲 | 作曲者 | 長さ | 元の楽譜（入力者） | ライセンス | 変更 |
+| --- | --- | --- | --- | --- | --- |
+| 月光 第1楽章 | ベートーヴェン | 5:07 | Mutopia Project [`BeethovenLv/O27/moonlight`](https://www.mutopiaproject.org/ftp/BeethovenLv/O27/moonlight/)（Stewart Holmes） | [CC BY-SA 2.5](https://creativecommons.org/licenses/by-sa/2.5/) | MIDI化 |
+| ノクターン 第2番 変ホ長調 | ショパン | 3:22 | Mutopia Project [`ChopinFF/O9/chopin_nocturne_op9_n2`](https://www.mutopiaproject.org/ftp/ChopinFF/O9/chopin_nocturne_op9_n2/)（Renato Biolcati Rinaldi） | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | MIDI化 |
+| 美しく青きドナウ（主題） | J.シュトラウス2世 | 0:39 | Mutopia Project [`StraussJJ/O314/blue_danube`](https://www.mutopiaproject.org/ftp/StraussJJ/O314/blue_danube/)（Nikos Kouremenos） | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | MIDI化（元の楽譜が、主題だけをハ長調にした易しい版） |
+| 家路（新世界より 第2楽章） | ドヴォルザーク | 3:25 | Mutopia Project [`DvorakA/O95/Sym9`](https://www.mutopiaproject.org/ftp/DvorakA/O95/Sym9/)（Keith OHara） | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | MIDI化。冒頭から最初の部分の終わり（45小節目あたり）までの抜粋 |
+| グノシエンヌ 第1番 | サティ | 3:17 | Mutopia Project [`SatieE/Gnossienne/no_1`](https://www.mutopiaproject.org/ftp/SatieE/Gnossienne/no_1/)（Knute Snortum） | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | MIDI化 |
+| ゴルトベルク変奏曲 アリア | バッハ | 3:12 | Mutopia Project [`BachJS/BWV988/bwv-988-aria`](https://www.mutopiaproject.org/ftp/BachJS/BWV988/bwv-988-aria/)（JD Erickson） | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | MIDI化 |
+| ピアノソナタ K.545 第1楽章 | モーツァルト | 4:25 | Mutopia Project [`MozartWA/KV545/K545-1`](https://www.mutopiaproject.org/ftp/MozartWA/KV545/K545-1/)（Alejandro Sierra） | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | MIDI化 |
+| カノン（3つのヴァイオリンと通奏低音・原曲版） | パッヘルベル | 4:05 | Mutopia Project [`PachelbelJ/Canon_per_3_Violini_e_Basso`](https://www.mutopiaproject.org/ftp/PachelbelJ/Canon_per_3_Violini_e_Basso/)（Michael Fischer v. Mollard） | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | MIDI化 |

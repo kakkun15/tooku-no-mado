@@ -1,9 +1,9 @@
 /* とおくの窓：再生（ふつう＝Web Audio／バックグラウンド＝audio要素）と環境音 */
 (function () {
   'use strict';
-  const PIECES = (window.CHILL_MUSIC || []).slice();
+  const PIECES = (window.CHILL_MUSIC || []).concat(window.CHILL_MUSIC_CC || []);
   const FAMILY_NAME = { soft: 'やさしい', box: 'オルゴール', chip: 'ファミコン' };
-  const GROUP_NAME = { shuumatsu: '終末ニュースの盤', yukikoro: 'ゆきころバトルの曲', mutopia: '新しく足した曲' };
+  const GROUP_NAME = { shuumatsu: '終末ニュースの盤', yukikoro: 'ゆきころバトルの曲', mutopia: '新しく足した曲', cc: '表示が必要な曲（CC）' };
 
   /* ---------- 合成を別スレッドで ---------- */
   let worker = null, jobs = {}, jobN = 0, local = null;
@@ -64,13 +64,17 @@
   function applyVolumes() {
     if (!ac) return;
     const t = ac.currentTime;
-    musicGain.gain.setTargetAtTime(P.get('mode') === 'bg' ? 0 : P.get('vol') / 100, t, 0.05);
-    ambGain.gain.setTargetAtTime(P.get('amb') / 100 * 0.9, t, 0.3);
+    // setTargetAtTime だけだと Safari で反映が遅れることがあるので、今の値から短く傾けて切り替える
+    const to = (prm, v, sec) => { try { prm.cancelScheduledValues(t); prm.setValueAtTime(prm.value, t); prm.linearRampToValueAtTime(v, t + sec); } catch (e) { prm.value = v; } };
+    to(musicGain.gain, P.get('mode') === 'bg' ? 0 : P.get('vol') / 100, 0.04);
+    to(ambGain.gain, P.get('amb') / 100 * 0.9, 0.08);
     el.volume = Math.min(1, P.get('vol') / 100);
   }
 
   /* ---------- 選曲 ---------- */
-  const enabledIds = () => { const off = new Set(P.get('off') || []); return PIECES.filter(p => !off.has(p.id)).map(p => p.id); };
+  // 表示が必要な曲（CC）を流すか。録画・配信のときはオフにする
+  const allowed = p => p.g !== 'cc' || P.get('cc') !== false;
+  const enabledIds = () => { const off = new Set(P.get('off') || []); return PIECES.filter(p => !off.has(p.id) && allowed(p)).map(p => p.id); };
   let bag = [], history = [];
   function nextId(after) {
     const ids = enabledIds(); if (!ids.length) return null;
@@ -109,11 +113,36 @@
     const bg = P.get('mode') === 'bg', opt = { family, slow: !!P.get('slow'), seed: Math.random() * 1000 | 0 };
     const r = await renderJob(piece, opt, bg);
     const item = { piece, family, dur: r.dur, bg, opt };
-    if (bg) item.url = URL.createObjectURL(new Blob([r.wav], { type: 'audio/wav' }));
+    if (bg) { item.wav = r.wav; item.url = wavUrl(r.wav); }
     else { ensureAC(); const b = ac.createBuffer(1, r.pcm.length, r.sr); if (b.copyToChannel) b.copyToChannel(r.pcm, 0); else b.getChannelData(0).set(r.pcm); item.buf = b; }
     return item;
   }
   function release(item) { if (item && item.url) URL.revokeObjectURL(item.url); }
+  // iPhone・iPad では audio 要素の音量を変えられない（いつも最大）。そこで音量を掛けた WAV を作って流す
+  const FIXED_VOL = (() => { try { const a = new Audio(); a.volume = 0.5; return Math.abs(a.volume - 0.5) > 0.01; } catch (e) { return false; } })();
+  function wavUrl(wav) {
+    const g = FIXED_VOL ? Math.min(1, P.get('vol') / 100) : 1;
+    if (g >= 0.999) return URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+    const src = new Int16Array(wav, 44), out = new ArrayBuffer(wav.byteLength), dst = new Int16Array(out, 44);
+    new Uint8Array(out, 0, 44).set(new Uint8Array(wav, 0, 44));
+    for (let i = 0; i < src.length; i++) dst[i] = src[i] * g;
+    return URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
+  }
+  let swapping = false;
+  function reapplyBgVolume() {
+    if (!FIXED_VOL) return;
+    for (const it of [S.next]) if (it && it.wav) { const u = wavUrl(it.wav); release(it); it.url = u; }
+    const c = S.cur; if (!c || !c.wav) return;
+    const isCur = el.src === c.url, pos = el.currentTime || 0, wasPlaying = isCur && !el.paused;
+    const u = wavUrl(c.wav); release(c); c.url = u;
+    if (!isCur) return;
+    swapping = true; el.src = u;
+    el.addEventListener('loadedmetadata', () => {
+      try { el.currentTime = pos; } catch (e) {}
+      if (wasPlaying) { const r = el.play(); if (r && r.catch) r.catch(() => {}); }
+      setTimeout(() => { swapping = false; }, 300);
+    }, { once: true });
+  }
   function stopSource() { if (S.src) { try { S.src.onended = null; S.src.stop(); } catch (e) {} S.src = null; } }
   function startCurrent(offset) {
     const c = S.cur; if (!c) return;
@@ -159,7 +188,7 @@
     } catch (e) { S.loading = false; emit(); console.warn(e); }
   }
   el.addEventListener('ended', () => { if (P.get('mode') === 'bg' && S.cur && S.cur.url && el.src === S.cur.url) advance(); });
-  el.addEventListener('pause', () => { if (P.get('mode') === 'bg' && !el.ended && S.playing && S.cur && el.src === S.cur.url) { S.playing = false; emit(); } });
+  el.addEventListener('pause', () => { if (!swapping && P.get('mode') === 'bg' && !el.ended && S.playing && S.cur && el.src === S.cur.url) { S.playing = false; emit(); } });
   el.addEventListener('play', () => { if (P.get('mode') === 'bg' && S.cur && el.src === S.cur.url) { S.playing = true; emit(); } });
 
   function unlock() {           // 最初のタップの中で音の出口を開けておく
@@ -202,7 +231,13 @@
   P.on('timbre', () => rebuild(false));
   P.on('slow', () => rebuild(true));
   P.on('mode', () => { applyVolumes(); unlock(); rebuild(true); });
-  P.on('vol', applyVolumes); P.on('amb', applyVolumes);
+  let volT = 0;
+  P.on('vol', () => { applyVolumes(); if (FIXED_VOL && P.get('mode') === 'bg') { clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 350); } });
+  P.on('amb', applyVolumes);
+  P.on('cc', v => {
+    if (S.next && !allowed(S.next.piece)) { release(S.next); S.next = null; prefetch(); }
+    if (!v && S.cur && !allowed(S.cur.piece) && enabledIds().length) skip();   // 録画の直前に切り替えることが多いので、すぐ次の曲へ
+  });
   P.on('off', () => { if (S.next && (P.get('off') || []).includes(S.next.piece.id)) { release(S.next); S.next = null; prefetch(); } });
 
   /* ---------- ロック画面の操作 ---------- */
@@ -287,7 +322,7 @@
   }
 
   window.TookuPlayer = {
-    PIECES, FAMILY_NAME, GROUP_NAME, state, play, pause, toggle, skip, prev, playPiece, unlock,
+    PIECES, FAMILY_NAME, GROUP_NAME, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
     setAmbience: kinds => { if (ac) setAmbience(kinds); else AMB.pending = kinds; },
     startAmbience: () => { ensureAC(); if (AMB.pending) { const k = AMB.pending; AMB.pending = null; AMB.kinds = ''; setAmbience(k); } },
