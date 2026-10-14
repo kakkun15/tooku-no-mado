@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b1026">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="とおくの窓">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>とおくの窓</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #f3efe6; --dim: rgba(243,239,230,.62); --panel: rgba(14,18,34,.78); --line: rgba(255,255,255,.12); --accent: #ffc870; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #0b1026; color: var(--ink); overflow: hidden; font-family: "DotGothic16", system-ui, sans-serif; }
+  #view { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  .glass { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+  /* はじめの画面 */
+  #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(6,8,20,.45); z-index: 30; transition: opacity .8s; }
+  #start.gone { opacity: 0; pointer-events: none; }
+  #start .card { text-align: center; padding: 28px 30px 24px; max-width: min(88vw, 380px); }
+  #start h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: .12em; font-weight: normal; }
+  #start p { margin: 0 0 20px; color: var(--dim); font-size: 14px; line-height: 1.7; }
+  #start .go { padding: 12px 34px; border-radius: 999px; background: var(--accent); color: #2a1a08; font-size: 17px; }
+
+  /* 再生中の帯 */
+  #bar { position: fixed; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 20;
+         display: flex; align-items: center; gap: 6px; padding: 8px 10px; transition: opacity .6s, transform .6s; max-width: 640px; margin: 0 auto; }
+  #bar.hide { opacity: 0; transform: translateY(14px); pointer-events: none; }
+  #bar .btn { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; flex: none; }
+  #bar .btn:active { background: rgba(255,255,255,.1); }
+  #bar .np { flex: 1; min-width: 0; line-height: 1.35; padding: 0 4px; }
+  #bar .t { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar .s { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #prog { height: 2px; background: rgba(255,255,255,.14); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  #prog i { display: block; height: 100%; width: 0; background: var(--accent); }
+  #where { position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); z-index: 19; font-size: 13px; color: var(--ink);
+           text-shadow: 0 1px 2px rgba(0,0,0,.7); transition: opacity .6s; }
+  #where.hide { opacity: 0; }
+  #where small { color: var(--dim); margin-left: 6px; }
+
+  /* 設定 */
+  #sheet { position: fixed; z-index: 40; right: 0; top: 0; bottom: 0; width: min(420px, 100vw); padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+           overflow-y: auto; border-radius: 0; transform: translateX(105%); transition: transform .35s; background: rgba(12,15,30,.94); border-left: 1px solid var(--line); }
+  #sheet.open { transform: none; }
+  #sheet h2 { font-size: 18px; font-weight: normal; margin: 6px 0 4px; display: flex; justify-content: space-between; align-items: center; }
+  #sheet h3 { font-size: 13px; font-weight: normal; color: var(--accent); margin: 22px 0 8px; letter-spacing: .1em; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .row .help { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; line-height: 1.5; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+  .seg button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+  .seg button.on { background: var(--accent); color: #2a1a08; border-color: var(--accent); }
+  input[type=range] { width: 150px; accent-color: var(--accent); }
+  select { font: inherit; font-size: 13px; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 200px; }
+  select option { background: #141830; }
+  .switch { width: 44px; height: 26px; border-radius: 13px; background: rgba(255,255,255,.15); position: relative; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
+  .switch.on { background: var(--accent); } .switch.on::after { left: 21px; }
+  .songs .grp { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 4px; font-size: 13px; color: var(--dim); }
+  .songs .grp button { font-size: 12px; color: var(--accent); }
+  .song { display: flex; align-items: center; gap: 10px; padding: 7px 2px; font-size: 13.5px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .song input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+  .song .nm { flex: 1; min-width: 0; }
+  .song .nm small { color: var(--dim); margin-left: 6px; }
+  .song .play { font-size: 12px; color: var(--accent); padding: 4px 6px; flex: none; }
+  .song.cur .nm { color: var(--accent); }
+  .note { font-size: 12px; color: var(--dim); line-height: 1.7; margin-top: 18px; }
+  .note a { color: var(--accent); }
+  .x { font-size: 22px; width: 40px; height: 40px; }
+  #toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 50; padding: 8px 14px; font-size: 13px; opacity: 0; transition: opacity .4s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="ドット絵の景色"></canvas>
+
+<div id="where" class="hide"></div>
+
+<div id="start">
+  <div class="card glass">
+    <h1>とおくの窓</h1>
+    <p>どこか遠くの景色を眺めながら、<br>著作権の切れた曲をずっと流す窓です。</p>
+    <button class="go" id="go">はじめる</button>
+  </div>
+</div>
+
+<div id="bar" class="glass hide">
+  <button class="btn" id="bPrev" aria-label="前の曲">⏮</button>
+  <button class="btn" id="bPlay" aria-label="再生・一時停止">▶</button>
+  <button class="btn" id="bNext" aria-label="次の曲">⏭</button>
+  <div class="np"><div class="t" id="nT">準備しています…</div><div class="s" id="nS"></div><div id="prog"><i></i></div></div>
+  <button class="btn" id="bScene" aria-label="次の景色">🖼</button>
+  <button class="btn" id="bSet" aria-label="設定">⚙</button>
+</div>
+
+<div id="sheet" aria-label="設定">
+  <h2>設定 <button class="x" id="bClose" aria-label="閉じる">×</button></h2>
+
+  <h3>音</h3>
+  <div class="row"><div>音色<span class="help">おまかせは曲ごとに変わります</span></div><div class="seg" data-pref="timbre" data-opts="auto:おまかせ,soft:やさしい,box:オルゴール,chip:ファミコン"></div></div>
+  <div class="row"><div>再生のしかた<span class="help">バックグラウンドは、曲を音声ファイルにしてから流します。画面を消しても鳴り続けやすい方式です（iPhoneは未確認）</span></div><div class="seg" data-pref="mode" data-opts="normal:ふつう,bg:バックグラウンド"></div></div>
+  <div class="row"><div>ゆったり再生<span class="help">テンポを少し落とします</span></div><button class="switch" data-switch="slow" aria-label="ゆったり再生"></button></div>
+  <div class="row"><div>曲の音量</div><input type="range" min="0" max="100" data-range="vol"></div>
+  <div class="row"><div>環境音<span class="help">焚き火・川・風・雨など</span></div><input type="range" min="0" max="100" data-range="amb"></div>
+  <div class="row"><div>曲の順番</div><div class="seg" data-pref="order" data-opts="shuffle:シャッフル,seq:順番"></div></div>
+
+  <h3>景色</h3>
+  <div class="row"><div>景色</div><select data-select="scene"></select></div>
+  <div class="row"><div>切り替える間隔</div><div class="seg" data-pref="interval" data-opts="5:5分,10:10分,20:20分,0:替えない"></div></div>
+  <div class="row"><div>時間帯</div><select data-select="tod"><option value="clock">時計に合わせる</option><option value="random">ランダム</option><option value="dawn">朝</option><option value="day">昼</option><option value="dusk">夕方</option><option value="night">夜</option></select></div>
+  <div class="row"><div>天気<span class="help">ランダムのときは季節も少し反映します</span></div><select data-select="weather"><option value="random">ランダム</option><option value="clear">晴れ</option><option value="cloudy">くもり</option><option value="rain">雨</option><option value="snow">雪</option><option value="fog">霧</option></select></div>
+
+  <h3>画面</h3>
+  <div class="row"><div>画面をつけたままにする<span class="help">対応しているブラウザだけ</span></div><button class="switch" data-switch="wake" aria-label="画面をつけたままにする"></button></div>
+  <div class="row"><div>なめらかさ<span class="help">低いほど電池にやさしい</span></div><div class="seg" data-pref="fps" data-opts="8:低,15:ふつう,24:高"></div></div>
+  <div class="row"><div>全画面</div><button class="seg" id="bFull"><span style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">切り替え</span></button></div>
+
+  <h3>曲（チェックを外すと流れません）</h3>
+  <div class="songs" id="songs"></div>
+
+  <div class="note">
+    曲はすべて作曲者の没後80年以上が過ぎた作品です。録音は使わず、楽譜の音符から音をその場で合成しています。出典は <a href="https://github.com/kakkun15/tooku-no-mado#曲と権利について" target="_blank" rel="noopener">README</a> に書いてあります。<br>
+    設定はこの端末のブラウザだけに保存されます。
+  </div>
+</div>
+<div id="toast" class="glass"></div>
+
+<script src="prefs.js"></script>
+<script src="music.js"></script>
+<script src="synth.js"></script>
+<script src="player.js"></script>
+<script src="engine.js"></script>
+<script src="art.js"></script>
+<script src="scenes-a.js"></script>
+<script src="scenes-b.js"></script>
+<script src="scenes-c.js"></script>
+<script src="stage.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.TOOKU_PREFS, PL = window.TookuPlayer, ST = window.TookuStage, A = window.TookuArt;
+  const $ = id => document.getElementById(id);
+  ST.init($('view'));
+
+  /* ---------- はじめる ---------- */
+  let started = false;
+  function start() {
+    if (started) return; started = true;
+    $('start').classList.add('gone');
+    PL.unlock(); PL.startAmbience(); PL.play();
+    poke(); wake();
+  }
+  $('go').addEventListener('click', start);
+  $('start').addEventListener('click', e => { if (e.target === $('start')) start(); });
+
+  /* ---------- 帯を出す・隠す ---------- */
+  let hideT = 0;
+  function poke() {
+    if (!started) return;
+    $('bar').classList.remove('hide'); if (P.get('info')) $('where').classList.remove('hide');
+    clearTimeout(hideT); hideT = setTimeout(() => { if (!$('sheet').classList.contains('open')) { $('bar').classList.add('hide'); $('where').classList.add('hide'); } }, 4500);
+  }
+  ['pointerdown', 'mousemove', 'keydown'].forEach(ev => window.addEventListener(ev, poke, { passive: true }));
+  $('bar').addEventListener('pointerdown', e => e.stopPropagation());
+
+  $('bPlay').onclick = () => PL.toggle();
+  $('bNext').onclick = () => PL.skip();
+  $('bPrev').onclick = () => PL.prev();
+  $('bScene').onclick = () => { ST.next(); };
+  $('bSet').onclick = () => { $('sheet').classList.add('open'); renderSongs(); };
+  $('bClose').onclick = () => { $('sheet').classList.remove('open'); poke(); };
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); started ? PL.toggle() : start(); }
+    if (e.key === 'n' || e.key === 'ArrowRight') PL.skip();
+    if (e.key === 's') ST.next();
+    if (e.key === 'Escape') $('sheet').classList.remove('open');
+  });
+
+  /* ---------- 再生中の表示 ---------- */
+  let curId = null;
+  PL.on(st => {
+    $('bPlay').textContent = st.playing ? '❚❚' : '▶';
+    if (st.loading && !st.piece) { $('nT').textContent = '曲を用意しています…'; $('nS').textContent = ''; }
+    else if (st.piece) { $('nT').textContent = st.piece.t; $('nS').textContent = st.piece.c + '・' + st.familyName + (st.loading ? '・次を用意中…' : ''); }
+    if (st.piece && st.piece.id !== curId) { curId = st.piece.id; markCur(); }
+  });
+  setInterval(() => { const st = PL.state(); $('prog').firstElementChild.style.width = st.dur ? Math.min(100, st.pos / st.dur * 100) + '%' : '0'; }, 500);
+  ST.on(i => { if (!i) return; $('where').innerHTML = i.name + '<small>' + i.tod + '・' + i.weather + '</small>'; });
+
+  /* ---------- 設定の部品 ---------- */
+  document.querySelectorAll('[data-pref]').forEach(el => {
+    const key = el.dataset.pref;
+    el.innerHTML = el.dataset.opts.split(',').map(o => { const [v, l] = o.split(':'); return `<button data-v="${v}">${l}</button>`; }).join('');
+    const sync = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(P.get(key)) === b.dataset.v));
+    el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const v = b.dataset.v; P.set(key, /^\d+$/.test(v) ? +v : v); sync(); });
+    sync();
+  });
+  document.querySelectorAll('[data-switch]').forEach(el => {
+    const key = el.dataset.switch, sync = () => el.classList.toggle('on', !!P.get(key));
+    el.onclick = () => { P.set(key, !P.get(key)); sync(); }; sync();
+  });
+  document.querySelectorAll('[data-range]').forEach(el => { const key = el.dataset.range; el.value = P.get(key); el.oninput = () => P.set(key, +el.value); });
+  const sceneSel = document.querySelector('[data-select=scene]');
+  sceneSel.innerHTML = '<option value="auto">いろいろ巡る</option>' + A.SCENES.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  document.querySelectorAll('[data-select]').forEach(el => { const key = el.dataset.select; el.value = P.get(key); el.onchange = () => P.set(key, el.value); });
+
+  /* ---------- 曲の一覧 ---------- */
+  function renderSongs() {
+    const off = new Set(P.get('off') || []), box = $('songs'), groups = {};
+    for (const p of PL.PIECES) (groups[p.g] = groups[p.g] || []).push(p);
+    const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    box.innerHTML = Object.entries(groups).map(([g, list]) => `
+      <div class="grp"><span>${PL.GROUP_NAME[g] || g}（${list.length}曲）</span><span><button data-all="${g}" data-on="1">全部オン</button> ・ <button data-all="${g}" data-on="0">全部オフ</button></span></div>
+      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}<small>${p.c}・${fmt(p.s)}</small></span><button class="play" data-play="${p.id}">流す</button></label>`).join('')}`).join('');
+  }
+  function markCur() { document.querySelectorAll('.song').forEach(el => el.classList.toggle('cur', el.dataset.id === curId)); }
+  $('songs').addEventListener('click', e => {
+    const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); PL.playPiece(pl.dataset.play); return; }
+    const all = e.target.closest('[data-all]');
+    if (all) { const g = all.dataset.all, on = all.dataset.on === '1', off = new Set(P.get('off') || []); PL.PIECES.filter(p => p.g === g).forEach(p => on ? off.delete(p.id) : off.add(p.id)); P.set('off', [...off]); renderSongs(); }
+  });
+  $('songs').addEventListener('change', e => {
+    const lab = e.target.closest('.song'); if (!lab) return; const off = new Set(P.get('off') || []);
+    e.target.checked ? off.delete(lab.dataset.id) : off.add(lab.dataset.id);
+    if (off.size >= PL.PIECES.length) { off.delete(lab.dataset.id); e.target.checked = true; toast('1曲は残してください'); }
+    P.set('off', [...off]);
+  });
+
+  /* ---------- 画面 ---------- */
+  let lock = null;
+  async function wake() {
+    try { if (P.get('wake') && 'wakeLock' in navigator && !document.hidden) { if (!lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } } else if (lock) { lock.release(); lock = null; } } catch (e) {}
+  }
+  P.on('wake', wake); document.addEventListener('visibilitychange', wake);
+  $('bFull').onclick = () => { const d = document; try { if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d); else { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen).call(el); } } catch (e) { toast('このブラウザでは全画面にできません。ホーム画面に追加すると全画面で開けます'); } };
+  function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2600); }
+  P.on('mode', v => toast(v === 'bg' ? 'バックグラウンド再生にしました（曲の用意に少し時間がかかります）' : 'ふつうの再生にしました'));
+})();
+</script>
+</body>
+</html>
