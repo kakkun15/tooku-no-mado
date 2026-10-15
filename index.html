@@ -17,7 +17,8 @@
   :root { --ink: #f3efe6; --dim: rgba(243,239,230,.62); --panel: rgba(14,18,34,.78); --line: rgba(255,255,255,.12); --accent: #ffc870; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: #0b1026; color: var(--ink); overflow: hidden; font-family: "DotGothic16", system-ui, sans-serif; }
-  #view { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+  #view { position: fixed; left: 0; top: 0; min-width: 100%; min-height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+  html { min-height: 100%; min-height: -webkit-fill-available; }
   body.dragging, body.dragging * { cursor: grabbing !important; }
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
   .glass { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }

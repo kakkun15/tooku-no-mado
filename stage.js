@@ -182,6 +182,8 @@
         for (let i = 0; i < d.length; i += 16) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
         const c = `rgb(${r / n | 0},${g / n | 0},${b / n | 0})`;
         document.documentElement.style.background = c; document.body.style.background = c;
+        // 端末が画面の端（ホームバーのあたり）を塗る色も合わせる
+        const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', c);
       } catch (e) {}
     }, 2000);
     // 大きさの通知が来ないまま変わることもあるので、ときどき確かめる（ずれていなければ何もしない）
