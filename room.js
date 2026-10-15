@@ -90,7 +90,7 @@
       toAll({ t: 'me', id, a }, id);
       if (isNew) addLog(id, nameOf(id) + ' さんが来ました', true);
       emit();
-    } else if (d.t === 'me' && R.names.has(id) && allow(id, 'me', 8)) {
+    } else if (d.t === 'me' && R.names.has(id) && allow(id, 'me', 12)) {
       const a = AV.sanitize(d.a); R.names.set(id, a); AV.setPerson(id, a); toAll({ t: 'me', id, a }, id); emit();
     } else if (d.t === 'chat' && R.names.has(id) && allow(id, 'chat', 1.2)) {
       const text = cleanText(d.text); if (!text) return;
@@ -182,13 +182,17 @@
     if (R.role === 'host') toAll({ t: 'chat', id: R.myId, text }); else send(R.host, { t: 'chat', text });
     addLog(R.myId, text); return true;
   }
-  let meT = 0;
+  // アバターが変わったら伝える。動かしている間も 0.15 秒ごとに送り、最後の位置は必ず届ける
+  let meT = 0, meAt = 0;
+  function sendMe() {
+    meT = 0; meAt = performance.now();
+    const a = AV.mine();
+    if (R.role === 'host') toAll({ t: 'me', id: R.myId, a }); else send(R.host, { t: 'me', a });
+  }
   P.on('av', () => {
-    if (!R.role) return;
-    clearTimeout(meT); meT = setTimeout(() => {
-      const a = AV.mine();
-      if (R.role === 'host') toAll({ t: 'me', id: R.myId, a }); else send(R.host, { t: 'me', a });
-    }, 150);
+    if (!R.role || meT) return;
+    const wait = Math.max(0, 150 - (performance.now() - meAt));
+    meT = setTimeout(sendMe, wait);
   });
   // ホストの景色が変わったら配る（時計に合わせた時刻のずれも、ときどき直す）
   let scT = 0;

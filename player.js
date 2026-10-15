@@ -321,7 +321,27 @@
     if (name === 'owl') { blip(420, 0.35, 0.03, 'sine', 380); setTimeout(() => blip(400, 0.6, 0.03, 'sine', 360), 600); }
   }
 
+  // 音量を決めるための試し音：曲と同じくらいの大きさで、オルゴールのような短いフレーズを鳴らす
+  let sampleEnd = 0;
+  function sample() {
+    ensureAC();
+    if (AMB.pending) { const k = AMB.pending; AMB.pending = null; AMB.kinds = ''; setAmbience(k); }   // 環境音もいっしょに聞こえるように
+    const t0 = Math.max(ac.currentTime + 0.03, sampleEnd), g = ac.createGain();
+    g.gain.value = Math.min(1, P.get('vol') / 100); g.connect(master);
+    [72, 76, 79, 84, 79, 76].forEach((p, i) => {
+      const f = 440 * Math.pow(2, (p - 69) / 12), st = t0 + i * 0.2;
+      [[1, 0.2], [2, 0.05], [3.01, 0.02]].forEach(([m, a]) => {
+        const o = ac.createOscillator(), e = ac.createGain();
+        o.frequency.value = f * m;
+        e.gain.setValueAtTime(0, st); e.gain.linearRampToValueAtTime(a, st + 0.008); e.gain.exponentialRampToValueAtTime(0.0005, st + 1.3 / m);
+        o.connect(e); e.connect(g); o.start(st); o.stop(st + 1.4);
+      });
+    });
+    sampleEnd = t0 + 1.4;
+  }
+
   window.TookuPlayer = {
+    sample,
     PIECES, FAMILY_NAME, GROUP_NAME, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
     setAmbience: kinds => { if (ac) setAmbience(kinds); else AMB.pending = kinds; },

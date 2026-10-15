@@ -3,9 +3,9 @@
   'use strict';
   const KEY = 'tooku-prefs-v1';
   const DEF = {
-    timbre: 'auto', mode: 'normal', slow: false, vol: 80, amb: 45, order: 'shuffle', off: [],
+    timbre: 'auto', mode: 'normal', slow: false, vol: 30, amb: 35, volOk: false, chatMin: false, dragHint: false, order: 'shuffle', off: [],
     scene: 'auto', interval: 10, tod: 'clock', weather: 'random', fps: 15, wake: false, info: true, cc: true,
-    av: { on: false, name: '', hair: 0, hc: 0, skin: 0, cloth: 1, act: 'pc', x: 0.5, y: 0.82 }
+    av: { on: false, name: '', hair: 0, hc: 0, skin: 0, cloth: 1, size: 1, face: 0, act: 'pc', x: 0.5, y: 0.82 }
   };
   let v = Object.assign({}, DEF);
   try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); for (const k in DEF) if (k in s) v[k] = s[k]; } catch (e) {}
