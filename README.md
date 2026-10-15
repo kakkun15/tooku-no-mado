@@ -3,7 +3,7 @@
 ドット絵の景色を眺めながら、著作権の切れた曲をずっと流し続けるWebページです。
 [終末ニュース](https://github.com/kakkun15/shuumatsu-news) の派生で、こちらは怖がらせる側ではなく、落ち着く側の窓です。
 
-- 曲は 103 曲（約262分）。うち8曲は、楽譜を入力した人の表示が必要な曲（Creative Commons）です。録音は使わず、楽譜の音符からブラウザの中で音を作ります
+- 曲は 109 曲（約286分）。うち10曲は、楽譜を入力した人の表示が必要な曲（Creative Commons）です。録音は使わず、楽譜の音符からブラウザの中で音を作ります
 - 音色は「やさしい」「オルゴール」「ファミコン」から選べます（おまかせなら曲ごとに変わります）
 - 景色は12か所。時間帯（時計に合わせる／朝・昼・夕方・夜）と天気（晴れ・くもり・雨・雪・霧）で見た目が変わります
 - 景色ごとに焚き火・川・風・波などの環境音が鳴ります
@@ -219,6 +219,10 @@
 | 美しき島 | パーセル | 0:48 | Mutopia Project `PurcellH/FairestIsle`（入力：Sebastian Brosig） |
 | 来たれ、ふたたび | ダウランド | 0:31 | Mutopia Project `DowlandJ/ALS17/ComeAgain`（入力：Peter Chubb） |
 | 桜見よとて | 日本古謡 | 1:00 | Mutopia Project `Traditional/JPM037-Sakura-Miyotote`（入力：patrick stanistreet） |
+| ブランデンブルク協奏曲 第2番 第1楽章 | バッハ | 4:55 | Mutopia Project `BachJS/BWV1047/brandenburg_2`（入力：Andy Vaught） |
+| ブランデンブルク協奏曲 第2番 第2楽章 | バッハ | 3:28 | Mutopia Project `BachJS/BWV1047/brandenburg_2`（入力：Andy Vaught） |
+| ブランデンブルク協奏曲 第2番 第3楽章 | バッハ | 2:46 | Mutopia Project `BachJS/BWV1047/brandenburg_2`（入力：Andy Vaught） |
+| ブランデンブルク協奏曲 第5番 第3楽章 | バッハ | 5:10 | Mutopia Project `BachJS/BWV1050/brand5-3`（入力：Joshua Koo） |
 
 「月光 第1楽章」はタレガがギター用に編曲した版です（タレガは1909年没）。
 
@@ -234,10 +238,10 @@
 
 ### 表示が必要な曲（Creative Commons）
 
-この8曲は、Mutopia Project の楽譜のうち、入力者が Creative Commons のライセンスで公開しているものから作りました。使うには、入力者の名前とライセンスを表示する必要があります。
+この10曲は、Mutopia Project の楽譜のうち、入力者が Creative Commons のライセンスで公開しているものから作りました。使うには、入力者の名前とライセンスを表示する必要があります。
 
 - 画面では、曲の一覧で曲名の横に「CC BY-SA 3.0」などの印が出ます。印を押すと、入力者・ライセンス・元の楽譜へのリンク・加えた変更が出ます。再生中は、曲名の下に小さく入力者とライセンスが出ます。
-- 設定の「表示が必要な曲も流す」をオフにすると、この8曲は流れません（流している途中なら、すぐ次の曲に移ります）。録画や配信で表示を入れられないときに使ってください。
+- 設定の「表示が必要な曲も流す」をオフにすると、この10曲は流れません（流している途中なら、すぐ次の曲に移ります）。録画や配信で表示を入れられないときに使ってください。
 - 変更点：どの曲も、楽譜（LilyPond 形式）を LilyPond 2.25 で MIDI に変換し、繰り返しを展開して、音符の並び（開始・長さ・音の高さ・役割と強さ）にしました。「家路」は下の表のとおり抜粋です。
 - BY-SA（継承）の曲は、変換したデータも同じライセンスで公開する条件があります。そのため `music-cc.js` の音符データは、各曲の元のライセンスのまま公開しています。ほかのファイル（再生のしくみ・景色・Public Domain の曲）には、これらのライセンスはかかりません。
 - 録画した音を公開するときも、下の表の入力者とライセンスを書いてください。
@@ -251,4 +255,8 @@
 | グノシエンヌ 第1番 | サティ | 3:17 | Mutopia Project [`SatieE/Gnossienne/no_1`](https://www.mutopiaproject.org/ftp/SatieE/Gnossienne/no_1/)（Knute Snortum） | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | MIDI化 |
 | ゴルトベルク変奏曲 アリア | バッハ | 3:12 | Mutopia Project [`BachJS/BWV988/bwv-988-aria`](https://www.mutopiaproject.org/ftp/BachJS/BWV988/bwv-988-aria/)（JD Erickson） | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | MIDI化 |
 | ピアノソナタ K.545 第1楽章 | モーツァルト | 4:25 | Mutopia Project [`MozartWA/KV545/K545-1`](https://www.mutopiaproject.org/ftp/MozartWA/KV545/K545-1/)（Alejandro Sierra） | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) | MIDI化 |
+| ブランデンブルク協奏曲 第1番 第1楽章 | バッハ | 3:43 | Mutopia Project [`BachJS/BWV1046/Brandenburg1-1`](https://www.mutopiaproject.org/ftp/BachJS/BWV1046/Brandenburg1-1/)（Ben Stewart） | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | MIDI化 |
+| ブランデンブルク協奏曲 第1番 第2楽章 | バッハ | 3:39 | Mutopia Project [`BachJS/BWV1046/Brandenburg1-2`](https://www.mutopiaproject.org/ftp/BachJS/BWV1046/Brandenburg1-2/)（Ben Stewart） | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | MIDI化 |
 | カノン（3つのヴァイオリンと通奏低音・原曲版） | パッヘルベル | 4:05 | Mutopia Project [`PachelbelJ/Canon_per_3_Violini_e_Basso`](https://www.mutopiaproject.org/ftp/PachelbelJ/Canon_per_3_Violini_e_Basso/)（Michael Fischer v. Mollard） | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | MIDI化 |
+
+ブランデンブルク協奏曲の楽譜にはテンポの指定がない（または遅い）ものがあるため、演奏でよく使われる速さに合わせています（第2番：第1楽章 四分音符=96、第2楽章 56、第3楽章 100）。第3番・第4番・第6番は Mutopia に楽譜がないため入っていません。
