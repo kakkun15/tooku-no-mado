@@ -155,6 +155,16 @@
   #chatOpen { display: none; align-self: flex-start; position: relative; padding: 8px 12px; border-radius: 999px; font-size: 13px; color: #fff; background: rgba(8,10,24,.5); border: 1px solid rgba(255,255,255,.22); }
   #chat.min #chatOpen { display: block; }
   #chatOpen.unread::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #ff7a6a; }
+  /* 曲の小話 */
+  #note { position: fixed; z-index: 18; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 30px); transform: translate(-50%, -6px); width: min(560px, calc(100vw - 24px));
+          padding: 10px 14px 9px; font-size: 13.5px; line-height: 1.65; opacity: 0; transition: opacity 1.2s, transform 1.2s; pointer-events: none; }
+  #note.show { opacity: 1; transform: translate(-50%, 0); }
+  #note .hd { font-size: 11.5px; color: var(--accent); margin-bottom: 2px; letter-spacing: .05em; }
+  #note a { color: var(--dim); font-size: 11px; margin-left: 6px; pointer-events: auto; }
+  .song .info { font-size: 12px; color: var(--dim); padding: 2px 6px; flex: none; border: 1px solid var(--line); border-radius: 6px; }
+  .songnote { display: none; font-size: 12.5px; color: var(--ink); line-height: 1.7; padding: 6px 4px 10px 30px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .songnote.open { display: block; }
+  .songnote p { margin: 0 0 4px; } .songnote a { color: var(--accent); font-size: 11.5px; }
   #toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 50; padding: 8px 14px; font-size: 13px; opacity: 0; transition: opacity .4s; pointer-events: none; }
   #toast.show { opacity: 1; }
 </style>
@@ -201,6 +211,7 @@
   <div class="row"><div>環境音<span class="help">焚き火・川・風・雨など</span></div><input type="range" min="0" max="100" data-range="amb"></div>
   <div class="row"><div>怖めの曲をやわらかく<span class="help">怒りの日・山の魔王の宮殿にて・トッカータとフーガなど7曲を、強弱と低音をおさえて、少しゆっくり、オルゴールかやさしい音色で流します（音の並びは変えません）</span></div><button class="switch" data-switch="calm" aria-label="怖めの曲をやわらかく"></button></div>
   <div class="row"><div>表示が必要な曲も流す<span class="help">クリエイティブ・コモンズ（CC）の曲です。録画や配信のときにオフにすると、表示のいらない曲だけが流れます</span></div><button class="switch" data-switch="cc" aria-label="表示が必要な曲も流す"></button></div>
+  <div class="row"><div>曲の小話<span class="help">曲が始まると、その曲の歴史や逸話を少しだけ出します。どれも資料で確かめたことだけで、出典へのリンクつき</span></div><div class="seg" data-pref="notes" data-opts="caption:字幕,avatar:アバター,off:出さない"></div></div>
   <div class="row"><div>曲の順番</div><div class="seg" data-pref="order" data-opts="shuffle:シャッフル,seq:順番"></div></div>
 
   <h3>景色</h3>
@@ -219,7 +230,7 @@
   <div class="songs" id="songs"></div>
 
   <div class="note">
-    曲はすべて作曲者の没後80年以上が過ぎた作品です。録音は使わず、楽譜の音符から音をその場で合成しています。<br>
+    曲は、持ち込みの曲をのぞいて、すべて作曲者の没後80年以上が過ぎた作品か古い民謡です。録音は使わず、楽譜の音符から音をその場で合成しています。<br>
     「CC」の印がある曲は、楽譜を入力した人の表示が必要な曲です。印を押すと、入力した人とライセンスが出ます。<br>
     出典は <a href="https://github.com/kakkun15/tooku-no-mado#曲と権利について" target="_blank" rel="noopener">README</a> に書いてあります。<br>
     設定はこの端末のブラウザだけに保存されます。
@@ -286,12 +297,14 @@
   <div id="chatLines" aria-live="polite"></div>
   <form id="chatForm" autocomplete="off"><input id="chatIn" maxlength="80" placeholder="ひとこと（80文字まで）" enterkeyhint="send"><button class="send" type="submit">送る</button><button type="button" id="chatMin" aria-label="チャットをたたむ">ー</button></form>
 </div>
+<div id="note" class="glass" aria-live="polite"><div class="hd"></div><div class="tx"></div></div>
 <div id="toast" class="glass"></div>
 
 <script src="prefs.js"></script>
 <script src="music.js"></script>
 <script src="music-cc.js"></script>
 <script src="music-mine.js"></script>
+<script src="notes.js"></script>
 <script src="synth.js"></script>
 <script src="player.js"></script>
 <script src="engine.js"></script>
@@ -370,6 +383,26 @@
     $('nL').textContent = lic ? lic.name + '・楽譜の入力：' + st.piece.by + '（Mutopia Project）' : '';
     $('nL').classList.toggle('on', !!lic);
   });
+  /* ---------- 曲の小話 ---------- */
+  // 曲が始まって少ししたら1つめ、曲の半ばで2つめを出す
+  let noteFor = null, noteShown = 0, noteT = 0;
+  function showNote(piece, i) {
+    const n = NOTES[piece.id]; if (!n || !n.f[i]) return;
+    const text = n.f[i], mode = P.get('notes');
+    if (mode === 'avatar' && AV.mine().on) { AV.say('me', text); return; }
+    $('note').querySelector('.hd').textContent = '♪ ' + piece.t;
+    const tx = $('note').querySelector('.tx'); tx.textContent = text;
+    const a = document.createElement('a'); a.href = n.src[0]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '出典'; tx.appendChild(a);
+    $('note').classList.add('show');
+    clearTimeout(noteT); noteT = setTimeout(() => $('note').classList.remove('show'), 9000 + text.length * 90);
+  }
+  setInterval(() => {
+    const st = PL.state(); if (!st.piece || !st.playing || P.get('notes') === 'off') return;
+    if (noteFor !== st.piece.id) { noteFor = st.piece.id; noteShown = 0; clearTimeout(noteT); $('note').classList.remove('show'); }
+    if (noteShown === 0 && st.pos > 6) { noteShown = 1; showNote(st.piece, 0); }
+    else if (noteShown === 1 && st.dur > 40 && st.pos > st.dur * 0.5) { noteShown = 2; showNote(st.piece, 1); }
+  }, 1000);
+  P.on('notes', v => { if (v === 'off') $('note').classList.remove('show'); });
   setInterval(() => { const st = PL.state(); $('prog').firstElementChild.style.width = st.dur ? Math.min(100, st.pos / st.dur * 100) + '%' : '0'; }, 500);
   ST.on(i => { if (!i) return; $('where').innerHTML = i.name + '<small>' + i.tod + '・' + i.weather + '</small>'; });
 
@@ -401,7 +434,13 @@
     const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     box.innerHTML = Object.entries(groups).map(([g, list]) => `
       <div class="grp"><span>${PL.GROUP_NAME[g] || g}（${list.length}曲）</span><span><button data-all="${g}" data-on="1">全部オン</button> ・ <button data-all="${g}" data-on="0">全部オフ</button></span></div>
-      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span><button class="play" data-play="${p.id}">流す</button></label>${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
+      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span>${NOTES[p.id] ? `<button class="info" data-info="${p.id}" aria-label="この曲のこと">i</button>` : ''}<button class="play" data-play="${p.id}">流す</button></label>${NOTES[p.id] ? noteInfo(p) : ''}${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
+  }
+  const NOTES = window.CHILL_NOTES || {};
+  const host = u => { try { return decodeURIComponent(new URL(u).hostname.replace(/^www\./, '')); } catch (e) { return '出典'; } };
+  function noteInfo(p) {
+    const n = NOTES[p.id];
+    return `<div class="songnote" id="sn-${p.id}">${n.f.map(t => '<p>' + esc(t) + '</p>').join('')}${n.src.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">出典：${esc(host(u))}</a>`).join(' ')}</div>`;
   }
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function licInfo(p) {
@@ -415,6 +454,7 @@
   function markCur() { document.querySelectorAll('.song').forEach(el => el.classList.toggle('cur', el.dataset.id === curId)); }
   $('songs').addEventListener('click', e => {
     const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); if (!PL.allowed(PL.PIECES.find(p => p.id === pl.dataset.play))) { toast('「表示が必要な曲も流す」がオフになっています'); return; } PL.playPiece(pl.dataset.play); return; }
+    const ib = e.target.closest('[data-info]'); if (ib) { e.preventDefault(); const box = $('sn-' + ib.dataset.info); box.classList.toggle('open'); return; }
     const lb = e.target.closest('[data-lic]'); if (lb) { e.preventDefault(); const box = $('li-' + lb.dataset.lic); box.classList.toggle('open'); lb.classList.toggle('on', box.classList.contains('open')); return; }
     const all = e.target.closest('[data-all]');
     if (all) { const g = all.dataset.all, on = all.dataset.on === '1', off = new Set(P.get('off') || []); PL.PIECES.filter(p => p.g === g).forEach(p => on ? off.delete(p.id) : off.add(p.id)); P.set('off', [...off]); renderSongs(); }

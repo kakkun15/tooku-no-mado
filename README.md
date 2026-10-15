@@ -3,7 +3,7 @@
 ドット絵の景色を眺めながら、著作権の切れた曲をずっと流し続けるWebページです。
 [終末ニュース](https://github.com/kakkun15/shuumatsu-news) の派生で、こちらは怖がらせる側ではなく、落ち着く側の窓です。
 
-- 曲は 109 曲（約286分）。うち10曲は、楽譜を入力した人の表示が必要な曲（Creative Commons）です。録音は使わず、楽譜の音符からブラウザの中で音を作ります
+- 曲は 121 曲（約314分）。うち10曲は、楽譜を入力した人の表示が必要な曲（Creative Commons）です。録音は使わず、楽譜の音符からブラウザの中で音を作ります
 - 音色は「やさしい」「オルゴール」「ファミコン」から選べます（おまかせなら曲ごとに変わります）
 - 景色は12か所。時間帯（時計に合わせる／朝・昼・夕方・夜）と天気（晴れ・くもり・雨・雪・霧）で見た目が変わります
 - 景色ごとに焚き火・川・風・波などの環境音が鳴ります
@@ -77,12 +77,20 @@
 - **受け取ったものの扱い**：ホストは送り主を実際の接続相手で見分け、値の種類と長さを確かめてから配ります。送る回数にも上限があります。画面には文字としてだけ表示します（HTML として解釈しません）。
 - **IP アドレス**：ICE 候補にはグローバル IP アドレスが含まれるため、同じ部屋の人には見えます。チャットの記録は各端末のメモリの中だけで、保存も送信もしません。
 
+## 曲の小話
+
+曲が始まって少しすると、その曲の歴史や逸話を1つ、曲の半ばでもう1つ、画面の上に字幕で出します（設定の「曲の小話」で、字幕・アバターに言わせる・出さない、を選べます）。曲の一覧の「i」を押すと、全部の小話と出典が見られます。
+
+- 小話は `notes.js` にあり、111曲ぶんあります。どれも出典（主に Wikipedia の日本語版・英語版、日本の俗謡は Mutopia の楽譜に書かれた出典）に書かれていることだけを、短く言い換えて書いています。資料で確かめられなかった曲には、小話を付けていません。
+- 間違いを見つけたら、Issues で教えてください。
+
 ## ファイル
 
 | ファイル | 中身 |
 | --- | --- |
 | `index.html` | 画面と操作 |
 | `music.js` | 曲の音符データ（開始・長さ・音の高さ・役割と強さ）。Public Domain の曲だけ |
+| `notes.js` | 曲の小話と出典 |
 | `music-mine.js` | 持ち込みの曲（作者から受け取った MIDI をアレンジしたもの） |
 | `music-cc.js` | 表示が必要な曲（Creative Commons）の音符データ。元の楽譜のライセンスを引き継ぐ |
 | `synth.js` | 音の合成。Web Worker の中で動く |
@@ -223,6 +231,18 @@
 | ブランデンブルク協奏曲 第2番 第2楽章 | バッハ | 3:28 | Mutopia Project `BachJS/BWV1047/brandenburg_2`（入力：Andy Vaught） |
 | ブランデンブルク協奏曲 第2番 第3楽章 | バッハ | 2:46 | Mutopia Project `BachJS/BWV1047/brandenburg_2`（入力：Andy Vaught） |
 | ブランデンブルク協奏曲 第5番 第3楽章 | バッハ | 5:10 | Mutopia Project `BachJS/BWV1050/brand5-3`（入力：Joshua Koo） |
+| 権兵衛が種まく | 日本の俗謡 | 0:44 | Mutopia Project `Traditional/JPM001-GonbeGaTanemaku`（入力：patrick stanistreet） |
+| お江戸日本橋 | 日本の俗謡 | 0:49 | Mutopia Project `Traditional/JPM007-O-Edo-Nihonbashi`（入力：patrick stanistreet） |
+| かっぽれ | 日本の俗謡 | 1:35 | Mutopia Project `Traditional/JPM024-Kappore`（入力：patrick stanistreet） |
+| 黒髪 | 日本の俗謡 | 2:25 | Mutopia Project `Traditional/JPM040-Kuro-Kami`（入力：patrick stanistreet） |
+| 越後獅子 | 日本の俗謡 | 1:01 | Mutopia Project `Traditional/JPM096-Echigo-Jishi-hiragana`（入力：patrick stanistreet） |
+| 伊予節 | 日本の俗謡 | 1:24 | Mutopia Project `Traditional/JPM072-Iyo-Bushi`（入力：patrick stanistreet） |
+| 星条旗よ永遠なれ | スーザ | 3:31 | Mutopia Project `SousaJP/TheStarsAndStripesForever`（入力：Benjamin Bloomfield） |
+| 自由の鐘 | スーザ | 3:10 | Mutopia Project `SousaJP/TheLibertyBell`（入力：Benjamin Bloomfield） |
+| おやすみ、いとしい子（Slumber My Darling） | フォスター | 2:15 | Mutopia Project `FosterSC/slumber`（入力：Stan Sanderson） |
+| イージー・ウィナーズ | ジョプリン | 4:12 | Mutopia Project `JoplinS/winners`（入力：Tom Harke） |
+| エリート・シンコペーションズ | ジョプリン | 4:06 | Mutopia Project `JoplinS/EliteSyncopations`（入力：Benjamin Bloomfield） |
+| 真夜中に澄み渡る（It Came Upon the Midnight Clear） | ウィリス | 0:48 | Mutopia Project `WillisRS/carol`（入力：Steve Dunlop） |
 
 「月光 第1楽章」はタレガがギター用に編曲した版です（タレガは1909年没）。
 
