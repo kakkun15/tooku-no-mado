@@ -51,6 +51,7 @@
   #bar .np { flex: 1; min-width: 0; line-height: 1.35; padding: 0 4px; }
   #bar .t { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #bar .s { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 480px) { #bar { gap: 0; padding: 6px 6px; } #bar .btn { width: 35px; height: 38px; } #bar .btn svg.px { width: 21px; height: 21px; } #bar .np { padding: 0 3px; } }
   #prog { height: 2px; background: rgba(255,255,255,.14); border-radius: 2px; margin-top: 5px; overflow: hidden; }
   #prog i { display: block; height: 100%; width: 0; background: var(--accent); }
   #where { position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); z-index: 19; font-size: 13px; color: var(--ink);
@@ -170,29 +171,64 @@
   #chat.min #chatOpen { display: block; }
   #chatOpen.unread::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #ff7a6a; }
   /* 曲の小話 */
-  #note { position: fixed; z-index: 18; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 30px); transform: translate(-50%, -6px); width: min(560px, calc(100vw - 24px));
-          padding: 10px 14px 9px; font-size: 13.5px; line-height: 1.65; opacity: 0; transition: opacity 1.2s, transform 1.2s; pointer-events: none; }
+  /* 字幕：箱は出さず、うすい影の上に静かに文字を流す */
+  #note { position: fixed; z-index: 18; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 30px); transform: translate(-50%, -4px); width: min(580px, calc(100vw - 32px));
+          padding: 8px 16px 9px; font-size: 14px; line-height: 1.75; color: #fff; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.4);
+          background: radial-gradient(ellipse at center, rgba(6,8,20,.44), rgba(6,8,20,.22) 60%, rgba(6,8,20,0) 80%); border-radius: 30px;
+          opacity: 0; transition: opacity 1.6s, transform 1.6s; pointer-events: none; }
   #note.show { opacity: 1; transform: translate(-50%, 0); }
-  #note .hd { font-size: 11.5px; color: var(--accent); margin-bottom: 2px; letter-spacing: .05em; }
-  #note a { color: var(--dim); font-size: 11px; margin-left: 6px; pointer-events: auto; }
-  #note .hd { display: flex; align-items: center; gap: 5px; }
-  #note .hd svg.px { width: 14px; height: 14px; }
-  /* 小話を出し終わったあとに残る「i」。押すとその曲の話を全部読める */
-  #noteI { position: fixed; z-index: 18; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 30px); transform: translateX(-50%) scale(.6);
-           width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--accent); opacity: 0; pointer-events: none; transition: opacity .8s, transform .8s; }
-  #noteI.show { opacity: .8; transform: translateX(-50%); pointer-events: auto; }
-  #noteI svg.px { width: 22px; height: 22px; }
-  #story { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgba(4,6,16,.42); opacity: 0; pointer-events: none; transition: opacity .3s; padding: 16px; }
-  #story.open { opacity: 1; pointer-events: auto; }
-  #story .card { position: relative; width: min(600px, 100%); max-height: min(78vh, 78lvh); display: flex; flex-direction: column; background: rgba(12,15,30,.94); }
-  #story .x { position: absolute; right: 6px; top: 6px; }
-  #storyBody { overflow-y: auto; padding: 18px 20px 16px; font-size: 14.5px; line-height: 1.9; }
-  #storyBody h4 { margin: 0 34px 10px 0; font-weight: normal; font-size: 17px; color: var(--accent); }
-  #storyBody h4 small { display: block; font-size: 12px; color: var(--dim); }
-  #storyBody p { margin: 0 0 12px; text-indent: 1em; }
-  #storyBody .muted { text-indent: 0; }
-  #storyBody .src { font-size: 12px; color: var(--dim); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
-  #storyBody .src a { color: var(--accent); word-break: break-all; }
+  #note .hd { font-size: 11.5px; color: #ffe2a8; margin-bottom: 1px; letter-spacing: .05em; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  #note .hd svg.px { width: 13px; height: 13px; }
+  #note .tx span { display: inline; transition: opacity .5s; }
+  /* 景色・音楽のパネル：帯のすぐ上に、半透明でせり上がる（右半分を占めるのは設定だけ） */
+  .pop { position: fixed; z-index: 23; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); max-width: 640px; margin: 0 auto;
+         bottom: calc(max(12px, env(safe-area-inset-bottom)) + 64px); max-height: min(60vh, 560px); overflow-y: auto; overscroll-behavior: contain;
+         padding: 10px 14px 12px; border-radius: 16px; background: rgba(12,15,30,.58); border: 1px solid var(--line); backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1);
+         opacity: 0; transform: translateY(14px); pointer-events: none; transition: opacity .3s, transform .3s; scrollbar-width: thin; }
+  .pop.open { opacity: 1; transform: none; pointer-events: auto; }
+  .pop .ph { display: flex; align-items: center; gap: 10px; position: sticky; top: -10px; margin: -10px -14px 6px; padding: 8px 6px 6px 14px; background: rgba(12,15,30,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 1; border-radius: 16px 16px 0 0; }
+  .pop .ph b { font-weight: normal; font-size: 15px; color: var(--accent); flex: none; }
+  .pop .ph span { flex: 1; min-width: 0; font-size: 12.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pop .x { width: 34px; height: 34px; }
+  .pop .lock { display: none; margin: 2px 0 8px; font-size: 12.5px; line-height: 1.6; color: #ffe2a8; background: rgba(255,200,112,.12); border-radius: 10px; padding: 7px 10px; }
+  .pop.locked .lock { display: block; }
+  .pop.locked .ctl { opacity: .38; pointer-events: none; }
+  .prow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .prow > span:first-child { color: var(--dim); min-width: 4.5em; }
+  .prow small { color: var(--dim); font-size: 12px; }
+  .prow .sw { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); margin-left: auto; }
+  .seg.left { justify-content: flex-start; }
+  #psMode { margin: 2px 0 8px; } #psMode button { padding: 7px 14px; font-size: 13.5px; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; padding: 6px 0 10px; }
+  .thumbs button { position: relative; padding: 0; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: rgba(255,255,255,.05); aspect-ratio: 150 / 96; }
+  .thumbs button.on { border-color: var(--accent); }
+  .thumbs canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  .thumbs span { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 6px 4px; font-size: 11.5px; text-align: left; background: linear-gradient(transparent, rgba(6,8,20,.82)); color: #fff; text-shadow: 0 1px 2px #000; }
+  .pop .moods { padding: 0; }
+  /* 音楽パネルの「この曲の話」 */
+  .story { font-size: 14px; line-height: 1.85; padding: 2px 2px 10px; }
+  .story .tabs { margin: 0 0 6px; }
+  .story h4 { margin: 0 0 6px; font-weight: normal; font-size: 16px; color: var(--ink); }
+  .story h4 small { display: block; font-size: 12px; color: var(--dim); margin-top: 1px; }
+  .story p { margin: 0 0 10px; text-indent: 1em; }
+  .story .muted { text-indent: 0; }
+  .story .src { font-size: 12px; color: var(--dim); }
+  .story .src a { color: var(--accent); word-break: break-all; }
+  .story .lic { font-size: 11.5px; color: var(--dim); margin-bottom: 8px; }
+  #bMusic { position: relative; }
+  #bMusic.unread .dot { display: block; background: var(--accent); }
+  body.guest #bPrev, body.guest #bNext { opacity: .3; }
+  /* 小話を話す小鳥（画面の右下のすみ） */
+  #bird { position: fixed; z-index: 17; right: max(10px, env(safe-area-inset-right)); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 4px); width: 63px; height: 45px; pointer-events: none;
+          transform: translate(90px, -60px); opacity: 0; transition: transform 1.1s cubic-bezier(.3,.8,.3,1), opacity .8s, bottom .5s; }
+  #bird.in { transform: none; opacity: 1; }
+  #bird.out { transform: translate(80px, -90px); opacity: 0; }
+  body.baron #bird { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px); }
+  #bird .body svg { width: 63px; height: 45px; image-rendering: pixelated; display: block; }
+  #bird .bub { position: absolute; right: 52px; bottom: 34px; width: max-content; max-width: min(320px, 68vw); padding: 7px 11px; font-size: 13.5px; line-height: 1.6; color: #1d1a16;
+               background: #f8f3e8; border-radius: 12px 12px 2px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.35); opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s; }
+  #bird .bub.show { opacity: 1; transform: none; }
+  #bird .bub small { display: block; font-size: 10.5px; color: #8a7a60; }
   .song .mood { font-size: 10.5px; padding: 0 5px; border-radius: 6px; margin-left: 6px; white-space: nowrap; color: #1d1a16; }
   .moods { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 10px; }
   .moods button { padding: 6px 10px; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); color: var(--dim); }
@@ -228,45 +264,57 @@
   <button class="btn" id="bPlay" aria-label="再生・一時停止" data-icon="play"></button>
   <button class="btn" id="bNext" aria-label="次の曲" data-icon="next"></button>
   <div class="np"><div class="t" id="nT">準備しています…</div><div class="s" id="nS"></div><div class="l" id="nL"></div><div id="prog"><i></i></div></div>
-  <button class="btn" id="bScene" aria-label="次の景色" data-icon="scene"></button>
+  <button class="btn" id="bScene" aria-label="景色を選ぶ" data-icon="scene"></button>
+  <button class="btn" id="bMusic" aria-label="音楽と曲の話" data-icon="note"><i class="dot"></i></button>
   <button class="btn" id="bRoom" aria-label="みんなの窓" data-icon="people"><i class="dot"></i></button>
   <button class="btn" id="bSet" aria-label="設定" data-icon="gear"></button>
 </div>
 
+<!-- 景色のパネル（下からせり上がる） -->
+<div id="popScene" class="pop" aria-label="景色">
+  <div class="ph"><b>景色</b><span id="psNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
+  <p class="lock" id="psLock">部屋のホストの景色に合わせています。景色はホストが選びます</p>
+  <div class="ctl">
+    <div class="seg left" id="psMode"><button data-mode="auto">いろいろ巡る</button><button data-mode="stay">この景色のまま</button></div>
+    <div class="prow" id="psInt"><span>替わる間隔</span><div class="seg left" data-pref="interval" data-opts="5:5分,10:10分,20:20分,30:30分"></div><small id="psLeft"></small></div>
+    <div class="thumbs" id="psList"></div>
+    <div class="prow"><span>時間帯</span><div class="seg left" data-pref="tod" data-opts="clock:時計どおり,random:ランダム,dawn:朝,day:昼,dusk:夕方,night:夜"></div></div>
+    <div class="prow"><span>天気</span><div class="seg left" data-pref="weather" data-opts="random:おまかせ,clear:晴れ,cloudy:くもり,rain:雨,snow:雪,fog:霧"></div></div>
+  </div>
+</div>
+<!-- 音楽のパネル -->
+<div id="popMusic" class="pop" aria-label="音楽">
+  <div class="ph"><b>音楽</b><span id="pmNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
+  <p class="lock" id="pmLock">部屋のホストと同じ曲を、同じところから流しています。曲はホストが選びます（一時停止はできます）</p>
+  <div class="story" id="pmStory"></div>
+  <div class="ctl" id="pmCtl">
+    <div class="prow"><span>音色</span><div class="seg left" data-pref="timbre" data-opts="auto:おまかせ,soft:やさしい,box:オルゴール,chip:ファミコン"></div></div>
+    <div class="prow"><span>曲の順番</span><div class="seg left" data-pref="order" data-opts="shuffle:シャッフル,seq:順番"></div><span class="sw"><button class="switch" data-switch="slow" aria-label="ゆったり再生"></button>ゆったり</span></div>
+    <div class="prow"><span>気分</span><div class="moods" id="moods"></div></div>
+    <input class="txt" id="songQ" type="search" placeholder="曲名・作曲者でさがす（例：ブランデンブルク）" autocomplete="off" style="width:100%;margin:6px 0 4px">
+    <p class="muted">チェックを外した曲は流れません。「流す」でその曲へ。</p>
+    <div class="songs" id="songs"></div>
+  </div>
+</div>
+<!-- 小話を話す小鳥 -->
+<div id="bird" aria-live="polite"><div class="bub"></div><div class="body"></div></div>
 <div id="shade"></div>
 <div id="sheet" class="sheet" aria-label="設定">
   <h2>設定 <button class="x" id="bClose" aria-label="閉じる" data-icon="close"></button></h2>
 
   <h3>音</h3>
-  <div class="row"><div>音色<span class="help">おまかせは曲ごとに変わります</span></div><div class="seg" data-pref="timbre" data-opts="auto:おまかせ,soft:やさしい,box:オルゴール,chip:ファミコン"></div></div>
   <div class="row"><div>再生のしかた<span class="help">バックグラウンドは、曲を音声ファイルにしてから流します。画面を消しても鳴り続けやすい方式です（iPhoneは未確認）</span></div><div class="seg" data-pref="mode" data-opts="normal:ふつう,bg:バックグラウンド"></div></div>
-  <div class="row"><div>ゆったり再生<span class="help">テンポを少し落とします</span></div><button class="switch" data-switch="slow" aria-label="ゆったり再生"></button></div>
   <div class="row"><div>曲の音量</div><input type="range" min="0" max="100" data-range="vol"></div>
   <div class="row"><div>環境音<span class="help">焚き火・川・風・雨など</span></div><input type="range" min="0" max="100" data-range="amb"></div>
   <div class="row"><div>怖めの曲をやわらかく<span class="help">怒りの日・山の魔王の宮殿にて・トッカータとフーガなど7曲を、強弱と低音をおさえて、少しゆっくり、オルゴールかやさしい音色で流します（音の並びは変えません）</span></div><button class="switch" data-switch="calm" aria-label="怖めの曲をやわらかく"></button></div>
   <div class="row"><div>表示が必要な曲も流す<span class="help">クリエイティブ・コモンズ（CC）の曲です。録画や配信のときにオフにすると、表示のいらない曲だけが流れます</span></div><button class="switch" data-switch="cc" aria-label="表示が必要な曲も流す"></button></div>
-  <div class="row stack"><div>曲の小話<span class="help">曲が流れているあいだに、その曲の歴史や逸話を出します。「くわしく」は何段落かを順に、「短く」はひとことを2つまで。出し終わると上に「i」が残り、押せばいつでも全部読めます。どれも資料で確かめたことだけで、出典つき</span></div><div class="seg" data-pref="noteLen" data-opts="long:くわしく,short:短く,off:出さない"></div></div>
-  <div class="row stack"><div>小話の出し方<span class="help">アバターは「みんなの窓」でアバターを出しているときだけ。ふきだしで1文ずつ話します</span></div><div class="seg" data-pref="notes" data-opts="caption:字幕,avatar:アバター"></div></div>
-  <div class="row"><div>曲の順番</div><div class="seg" data-pref="order" data-opts="shuffle:シャッフル,seq:順番"></div></div>
-
-  <h3>景色</h3>
-  <div class="row"><div>景色</div><select data-select="scene"></select></div>
-  <div class="row"><div>切り替える間隔</div><div class="seg" data-pref="interval" data-opts="5:5分,10:10分,20:20分,0:替えない"></div></div>
-  <div class="row"><div>時間帯</div><select data-select="tod"><option value="clock">時計に合わせる</option><option value="random">ランダム</option><option value="dawn">朝</option><option value="day">昼</option><option value="dusk">夕方</option><option value="night">夜</option></select></div>
-  <div class="row"><div>天気<span class="help">ランダムのときは季節も少し反映します</span></div><select data-select="weather"><option value="random">ランダム</option><option value="clear">晴れ</option><option value="cloudy">くもり</option><option value="rain">雨</option><option value="snow">雪</option><option value="fog">霧</option></select></div>
+  <div class="row stack"><div>曲の小話<span class="help">曲が流れているあいだに、その曲の歴史や逸話を出します。「くわしく」は何段落かを順に、「短く」はひとことを2つまで。見逃しても、下の音符のボタンを押せば、その曲の話を全部読めます。どれも資料で確かめたことだけで、出典つき</span></div><div class="seg" data-pref="noteLen" data-opts="long:くわしく,short:短く,off:出さない"></div></div>
+  <div class="row stack"><div>小話の出し方<span class="help">字幕は画面の上に静かに流れます。小鳥は、画面のすみに小さな鳥がやってきて、ふきだしで1文ずつ話します</span></div><div class="seg" data-pref="notes" data-opts="caption:字幕,bird:小鳥"></div></div>
 
   <h3>画面</h3>
-  <div class="row"><div>画面をつけたままにする<span class="help">対応しているブラウザだけ</span></div><button class="switch" data-switch="wake" aria-label="画面をつけたままにする"></button></div>
+  <div class="row"><div>画面をつけたままにする<span class="help">画面が暗くならないようにします。iPhone・iPad でホーム画面から開いているときは、うまく効かない機種があるので、見えない小さな動画を流して画面をつけておく方法も使います</span></div><button class="switch" data-switch="wake" aria-label="画面をつけたままにする"></button></div>
   <div class="row"><div>なめらかさ<span class="help">低いほど電池にやさしい</span></div><div class="seg" data-pref="fps" data-opts="8:低,15:ふつう,24:高"></div></div>
   <div class="row"><div>全画面</div><button class="seg" id="bFull"><span style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">切り替え</span></button></div>
-
-  <h3>気分で選ぶ</h3>
-  <div class="muted">押した気分の曲だけが流れます（何も選ばなければ全部）。気分は、曲の音符から自動で分析したものです。</div>
-  <div class="moods" id="moods"></div>
-
-  <h3>曲（チェックを外すと流れません）</h3>
-  <input class="txt" id="songQ" type="search" placeholder="曲名・作曲者でさがす（例：ブランデンブルク）" autocomplete="off" style="width:100%;margin:2px 0 4px">
-  <div class="songs" id="songs"></div>
 
   <div class="note">
     曲は、持ち込みの曲をのぞいて、すべて作曲者の没後80年以上が過ぎた作品か古い民謡です。録音は使わず、楽譜の音符から音をその場で合成しています。<br>
@@ -297,7 +345,7 @@
 
   <h3>部屋</h3>
   <div id="roomOut">
-    <p class="muted">部屋を作ると4文字の番号ができます。友だちがその番号で入ると、同じ景色の中にアバターが並び、チャットできます。曲はそれぞれの端末で流れます。</p>
+    <p class="muted">部屋を作ると4文字の番号ができます。友だちがその番号で入ると、同じ景色の中にアバターが並び、チャットできます。入った人は、景色と曲をホストに合わせます（同じ曲を同じところから流します）。</p>
     <div class="roomrow"><button class="btn2 main" id="rHost">部屋を作る</button></div>
     <div class="roomrow"><input class="txt" id="rCode" maxlength="4" placeholder="番号" autocapitalize="characters" autocomplete="off" style="width:96px;text-transform:uppercase;letter-spacing:.2em"><button class="btn2" id="rJoin">番号で入る</button></div>
   </div>
@@ -325,7 +373,7 @@
       <li><b>シグナリング</b>：接続情報（SDP と ICE 候補）の交換に、PeerJS の公開サーバー <code>0.peerjs.com</code> を使います。ホストは部屋の番号から決まる ID（<code>tooku-no-mado-XXXX</code>）で登録し、ゲストはその ID へ接続を申し込みます。</li>
       <li><b>NAT 越え</b>：PeerJS の既定の設定どおり、STUN（<code>stun.l.google.com</code>）で直接の経路を探し、だめなときは PeerJS の TURN サーバーで中継します。</li>
       <li><b>形</b>：スター型。ホストが全員とつながり、届いたものをほかの人へ配ります。最大 8 人。ホストが抜けると部屋は終わります。</li>
-      <li><b>送るもの</b>：アバターの見た目と位置（画面に対する割合 0〜1）、チャット（80文字まで）、ホストの景色・天気・時刻・乱数の種（同じ景色を描くため）。曲や音は送りません。</li>
+      <li><b>送るもの</b>：アバターの見た目と位置（画面に対する割合 0〜1）、チャット（80文字まで）、ホストの景色・天気・時刻・乱数の種（同じ景色を描くため）、ホストの曲の番号・音色・速さ・再生位置（同じ曲を同じところから流すため）。音そのものは送りません。</li>
       <li><b>受け取ったものの扱い</b>：ホストは送り主を接続相手で見分け、値の種類と長さを確かめてから配ります。送る回数にも上限があります。画面には文字としてだけ表示します（HTML として解釈しません）。</li>
       <li><b>IP アドレス</b>：ICE 候補にはグローバル IP アドレスが含まれるため、同じ部屋の人には見えます。会話の記録は各端末のメモリの中だけで、保存も送信もしません。</li>
     </ul>
@@ -336,9 +384,8 @@
   <div id="chatLines" aria-live="polite"></div>
   <form id="chatForm" autocomplete="off"><input id="chatIn" maxlength="80" placeholder="ひとこと（80文字まで）" enterkeyhint="send"><button class="send" type="submit">送る</button><button type="button" id="chatMin" aria-label="チャットをたたむ">ー</button></form>
 </div>
-<div id="note" class="glass" aria-live="polite"><div class="hd"></div><div class="tx"></div></div>
-<button id="noteI" class="glass" aria-label="この曲の話を読む" data-icon="info"></button>
-<div id="story" aria-label="この曲の話"><div class="card glass"><button class="x" id="storyX" aria-label="閉じる" data-icon="close"></button><div id="storyBody"></div></div></div>
+<div id="note" aria-live="polite"><div class="hd"></div><div class="tx"></div></div>
+<video id="keepAwake" src="keepawake.mp4" muted playsinline loop preload="auto" aria-hidden="true" style="position:fixed;width:1px;height:1px;opacity:0.01;left:0;top:0;pointer-events:none"></video>
 <div id="toast" class="glass"></div>
 
 <script src="icons.js"></script>
@@ -366,6 +413,8 @@
   const $ = id => document.getElementById(id);
   const IC = window.TookuIcons; IC.fill();
   ST.init($('view'));
+  // 前の版の「替えない」は「この景色のまま」に引き継ぐ
+  if (+P.get('interval') === 0) { const i = ST.info(); P.set('interval', 10); if (i && P.get('scene') === 'auto') P.set('scene', i.id); }
 
   /* ---------- はじめる ---------- */
   let started = false;
@@ -394,27 +443,42 @@
   let hideT = 0;
   function poke() {
     if (!started) return;
-    $('bar').classList.remove('hide'); if (P.get('info')) $('where').classList.remove('hide');
-    clearTimeout(hideT); hideT = setTimeout(() => { if (!document.querySelector('.sheet.open')) { $('bar').classList.add('hide'); $('where').classList.add('hide'); } }, 4500);
+    $('bar').classList.remove('hide'); document.body.classList.add('baron'); if (P.get('info')) $('where').classList.remove('hide');
+    clearTimeout(hideT); hideT = setTimeout(() => { if (!document.querySelector('.sheet.open, .pop.open')) { $('bar').classList.add('hide'); document.body.classList.remove('baron'); $('where').classList.add('hide'); } }, 4500);
   }
   ['pointerdown', 'mousemove', 'keydown'].forEach(ev => window.addEventListener(ev, poke, { passive: true }));
   $('bar').addEventListener('pointerdown', e => e.stopPropagation());
 
-  $('bPlay').onclick = () => PL.toggle();
-  $('bNext').onclick = () => PL.skip();
-  $('bPrev').onclick = () => PL.prev();
-  $('bScene').onclick = () => { ST.next(); };
-  const openSheet = () => { $('room').classList.remove('open'); $('sheet').classList.add('open'); $('shade').classList.add('open'); renderMoods(); renderSongs(); };
-  const closeSheet = () => { $('sheet').classList.remove('open'); $('room').classList.remove('open'); $('shade').classList.remove('open'); poke(); };
+  $('bPlay').onclick = () => { PL.toggle(); wake(); };
+  const guestSay = () => toast('部屋のホストに合わせています');
+  $('bNext').onclick = () => { if (PL.following) return guestSay(); PL.skip(); };
+  $('bPrev').onclick = () => { if (PL.following) return guestSay(); PL.prev(); };
+  /* ---------- 景色・音楽のパネル（帯の上） ---------- */
+  const pops = { scene: $('popScene'), music: $('popMusic') };
+  function openPop(k) {
+    closeSheet(true);
+    for (const [n, el] of Object.entries(pops)) el.classList.toggle('open', n === k && !el.classList.contains('open'));
+    if (pops.scene.classList.contains('open')) renderScenePop();
+    if (pops.music.classList.contains('open')) { renderMusicPop(); $('bMusic').classList.remove('unread'); }
+    poke();
+  }
+  const closePops = () => { for (const el of Object.values(pops)) el.classList.remove('open'); };
+  $('bScene').onclick = () => openPop('scene');
+  $('bMusic').onclick = () => openPop('music');
+  document.querySelectorAll('[data-popclose]').forEach(b => b.onclick = () => { closePops(); poke(); });
+  Object.values(pops).forEach(el => el.addEventListener('pointerdown', e => e.stopPropagation()));
+  $('view').addEventListener('pointerdown', () => { if (!AV.picking) closePops(); });
+  const openSheet = () => { closePops(); $('room').classList.remove('open'); $('sheet').classList.add('open'); $('shade').classList.add('open'); };
+  function closeSheet(keepPops) { $('sheet').classList.remove('open'); $('room').classList.remove('open'); $('shade').classList.remove('open'); if (!keepPops) poke(); }
   $('bSet').onclick = openSheet;
-  $('bClose').onclick = closeSheet;
-  $('shade').addEventListener('click', closeSheet);
+  $('bClose').onclick = () => closeSheet();
+  $('shade').addEventListener('click', () => closeSheet());
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
     if (e.code === 'Space') { e.preventDefault(); started ? PL.toggle() : start(); }
     if (e.key === 'n' || e.key === 'ArrowRight') PL.skip();
-    if (e.key === 's') ST.next();
-    if (e.key === 'Escape') { if ($('story').classList.contains('open')) closeStory(); else closeSheet(); }
+    if (e.key === 's' && !ST.next()) guestSay();
+    if (e.key === 'Escape') { closePops(); closeSheet(); }
   });
 
   /* ---------- 再生中の表示 ---------- */
@@ -423,24 +487,26 @@
     if ($('bPlay').dataset.st !== String(st.playing)) { $('bPlay').dataset.st = st.playing; $('bPlay').innerHTML = IC.svg(st.playing ? 'pause' : 'play'); }
     if (st.loading && !st.piece) { $('nT').textContent = '曲を用意しています…'; $('nS').textContent = ''; }
     else if (st.piece) { $('nT').textContent = st.piece.t; $('nS').textContent = st.piece.c + '・' + (PL.moodOf(st.piece) ? moodName(PL.moodOf(st.piece)) + '・' : '') + st.familyName + (st.loading ? '・次を用意中…' : ''); }
-    if (st.piece && st.piece.id !== curId) { curId = st.piece.id; markCur(); }
+    if (st.piece && st.piece.id !== curId) { if (curId && NOTES[curId]) { storyHist = storyHist.filter(x => x !== curId); storyHist.unshift(curId); storyHist.length = Math.min(storyHist.length, 6); } curId = st.piece.id; storyPick = null; storyTab = 0; markCur(); $('bMusic').classList.remove('unread'); if (pops.music.classList.contains('open')) renderMusicPop(); }
+    if (pops.music.classList.contains('open')) $('pmNow').textContent = st.playing ? '再生中' : '一時停止中';
     const lic = st.piece && st.piece.lic ? PL.LICENSES[st.piece.lic] : null;
     $('nL').textContent = lic ? lic.name + '・楽譜の入力：' + st.piece.by + '（Mutopia Project）' : '';
     $('nL').classList.toggle('on', !!lic);
   });
   /* ---------- 曲の小話 ---------- */
   // 長さ：くわしく（数段落を曲のあいだに順に）・短く（はじめに1つ、半ばでもう1つ）・出さない
-  // 出し終わったら、上に小さな「i」が残り、押すとその曲の話を全部と出典が見られる
+  // 出し方：字幕（画面の上に静かに）・小鳥（右下にとまって、ふきだしで1文ずつ）
+  // 見逃しても、音楽のパネルに、その曲の話がいつでも全部出ている
   if (P.get('notes') === 'off') { P.set('noteLen', 'off'); P.set('notes', 'caption'); }   // 前の版の「出さない」を引き継ぐ
-  const sentences = t => t.match(/[^。！？]+[。！？]?/g) || [t];
+  if (P.get('notes') === 'avatar') P.set('notes', 'bird');                                // アバターに言わせる → 小鳥に
+  const sentences = t => (t.match(/[^。！？]+[。！？」』）]*/g) || [t]).map(x => x.trim()).filter(Boolean);
+  const bird = () => P.get('notes') === 'bird';
   function noteItems(piece) {
     const n = NOTES[piece.id], len = P.get('noteLen'); if (!n || len === 'off') return [];
-    let list = len === 'long' && n.d && n.d.length ? n.d.slice() : n.f.slice();
-    if (P.get('notes') === 'avatar' && AV.mine().on) list = list.flatMap(sentences).map(t => t.trim()).filter(Boolean);   // ふきだしは1文ずつ
-    return list;
+    return len === 'long' && n.d && n.d.length ? n.d.slice() : n.f.slice();
   }
   const readSec = t => 7 + t.length * 0.13;   // 読み終わるまでの目安（秒）
-  // その曲のあいだに、いつ何を出すか決める。曲が短くて入りきらない分は「i」から読める
+  // その曲のあいだに、いつ何を出すか決める。曲が短くて入りきらない分は、音楽のパネルで読める
   function planNotes(piece, dur) {
     const items = noteItems(piece); if (!items.length) return [];
     if (P.get('noteLen') === 'short') return items.slice(0, dur > 40 ? 2 : 1).map((t, i) => ({ t, at: i ? dur * 0.5 : 6, i, n: items.length }));
@@ -450,42 +516,115 @@
     items.forEach((t, i) => { if (at < dur - 4) plan.push({ t, at, i, n: items.length }); at += readSec(t) + 2 + gap; });
     return plan;
   }
-  let noteFor = null, notePlan = [], noteT = 0, noteSeen = false;
+  let noteFor = null, notePlan = [], noteT = 0;
   function showNote(piece, it) {
-    const n = NOTES[piece.id];
-    noteSeen = true; hideNoteI();
-    if (P.get('notes') === 'avatar' && AV.mine().on) { AV.say('me', it.t); clearTimeout(noteT); noteT = setTimeout(showNoteI, (6 + it.t.length * 0.12) * 1000); return; }
+    if (!pops.music.classList.contains('open')) $('bMusic').classList.add('unread');   // 音符のボタンに「話がある」の印
+    if (bird()) { birdSay(piece, it); return; }
     const hd = $('note').querySelector('.hd'); hd.innerHTML = IC.svg('note');
     hd.append(piece.t + (it.n > 1 ? '　' + (it.i + 1) + '/' + it.n : ''));
-    const tx = $('note').querySelector('.tx'); tx.textContent = it.t;
-    const a = document.createElement('a'); a.href = n.src[0]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '出典'; tx.appendChild(a);
+    $('note').querySelector('.tx').textContent = it.t;
     $('note').classList.add('show');
-    clearTimeout(noteT); noteT = setTimeout(() => { $('note').classList.remove('show'); showNoteI(); }, readSec(it.t) * 1000);
+    clearTimeout(noteT); noteT = setTimeout(() => $('note').classList.remove('show'), readSec(it.t) * 1000);
   }
-  // 小話を出し終わったあとに残る「i」
-  function showNoteI() { const st = PL.state(); if (noteSeen && st.piece && NOTES[st.piece.id] && P.get('noteLen') !== 'off' && !$('note').classList.contains('show')) $('noteI').classList.add('show'); }
-  function hideNoteI() { $('noteI').classList.remove('show'); }
   setInterval(() => {
     const st = PL.state(); if (!st.piece) return;
-    if (noteFor !== st.piece.id) { noteFor = st.piece.id; noteSeen = false; notePlan = planNotes(st.piece, st.dur || st.piece.s); clearTimeout(noteT); $('note').classList.remove('show'); hideNoteI(); if ($('story').classList.contains('open')) openStory(st.piece.id); }
+    if (noteFor !== st.piece.id) { noteFor = st.piece.id; notePlan = planNotes(st.piece, st.dur || st.piece.s); clearTimeout(noteT); $('note').classList.remove('show'); }
     if (!st.playing) return;
     while (notePlan.length && st.pos >= notePlan[0].at) { const it = notePlan.shift(); if (st.pos < it.at + 20) showNote(st.piece, it); }
   }, 1000);
-  const replan = () => { const st = PL.state(); if (!st.piece) return; notePlan = planNotes(st.piece, st.dur || st.piece.s).filter(it => it.at > st.pos); if (P.get('noteLen') === 'off') { $('note').classList.remove('show'); hideNoteI(); } };
+  const replan = () => { const st = PL.state(); if (!st.piece) return; notePlan = planNotes(st.piece, st.dur || st.piece.s).filter(it => it.at > st.pos); $('note').classList.remove('show'); if (P.get('noteLen') === 'off' || !bird()) birdLeave(true); };
   P.on('noteLen', replan); P.on('notes', replan);
-  // 曲の話をぜんぶ見る
-  function storyHtml(id) {
-    const n = NOTES[id], p = PL.PIECES.find(q => q.id === id) || {};
-    const body = (n.d && n.d.length ? n.d : n.f).map(t => '<p>' + esc(t) + '</p>').join('');
-    const extra = n.d && n.d.length ? '' : '<p class="muted">この曲は、くわしい話がまだありません。</p>';
-    return `<h4>${esc(p.t || '')}<small>${esc(p.c || '')}</small></h4>${body}${extra}<div class="src">出典：${n.src.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(host(u))}</a>`).join('、')}</div>`;
+
+  /* ---------- 小鳥 ---------- */
+  // ドット絵の小鳥（左向き）。o=ふち b=からだ w=つばさ l=おなか k=くちばし e=目 c=ほお f=あし
+  const BIRD_ROWS = {
+    idle: ['.....oooo.....', '....obbbbo....', '...obebbbbo...', '..kobbbbbbo...', '...ocbbbbbbo..', '...olllbwwwbo.', '...ollllwwwbbo', '....olllbbbbo.', '.....oooooooo.', '......f..f....'],
+    talk: ['.....oooo.....', '....obbbbo....', '...obebbbbo...', '.kkobbbbbbo...', '..k.cbbbbbbo..', '...olllbwwwbo.', '...ollllwwwbbo', '....olllbbbbo.', '.....oooooooo.', '......f..f....'],
+    blink:['.....oooo.....', '....obbbbo....', '...obobbbbo...', '..kobbbbbbo...', '...ocbbbbbbo..', '...olllbwwwbo.', '...ollllwwwbbo', '....olllbbbbo.', '.....oooooooo.', '......f..f....']
+  };
+  const BIRD_COL = { o: '#2e2a3a', b: '#7fb2e0', w: '#5a8cc0', l: '#f4ead8', k: '#f0a040', e: '#1e1a28', c: '#f0a0a0', f: '#e08a40' };
+  const birdSvg = {};
+  for (const [k, rows] of Object.entries(BIRD_ROWS)) birdSvg[k] = `<svg viewBox="0 0 14 10" shape-rendering="crispEdges">${rows.map((r, y) => [...r].map((ch, x) => BIRD_COL[ch] ? `<rect x="${x}" y="${y}" width="1" height="1" fill="${BIRD_COL[ch]}"/>` : '').join('')).join('')}</svg>`;
+  const B = { q: [], busy: false, leaveT: 0, frame: 'idle', talkUntil: 0 };
+  const birdFrame = f => { if (B.frame !== f) { B.frame = f; $('bird').querySelector('.body').innerHTML = birdSvg[f]; } };
+  birdFrame('blink'); birdFrame('idle');
+  setInterval(() => {   // まばたきと、話しているあいだのくちばし
+    if (!$('bird').classList.contains('in')) return;
+    const now = performance.now();
+    if (now < B.talkUntil) birdFrame(Math.floor(now / 180) % 2 ? 'talk' : 'idle');
+    else birdFrame(Math.random() < 0.06 ? 'blink' : 'idle');
+  }, 180);
+  function birdSay(piece, it) {
+    clearTimeout(B.leaveT);
+    const el = $('bird'); el.classList.remove('out'); el.classList.add('in');
+    B.q.push(...sentences(it.t).map(t => ({ t, title: piece.t })));
+    if (!B.busy) setTimeout(birdNext, 900);
   }
-  function openStory(id) { if (!NOTES[id]) return; $('storyBody').innerHTML = storyHtml(id); $('storyBody').scrollTop = 0; $('story').classList.add('open'); }
-  const closeStory = () => $('story').classList.remove('open');
-  $('noteI').onclick = e => { e.stopPropagation(); const st = PL.state(); if (st.piece) openStory(st.piece.id); };
-  $('storyX').onclick = closeStory;
-  $('story').addEventListener('click', e => { if (e.target === $('story')) closeStory(); });
-  ['pointerdown'].forEach(ev => { $('story').addEventListener(ev, e => e.stopPropagation()); $('noteI').addEventListener(ev, e => e.stopPropagation()); });
+  function birdNext() {
+    const bub = $('bird').querySelector('.bub');
+    const x = B.q.shift();
+    if (!x) { B.busy = false; bub.classList.remove('show'); B.leaveT = setTimeout(() => birdLeave(), 5000); return; }
+    B.busy = true; bub.innerHTML = ''; const sm = document.createElement('small'); sm.textContent = '♪ ' + x.title; bub.append(sm, document.createTextNode(x.t)); bub.classList.add('show');
+    const sec = 3.5 + x.t.length * 0.14; B.talkUntil = performance.now() + Math.min(sec, 2.5) * 1000;
+    setTimeout(() => { bub.classList.remove('show'); setTimeout(birdNext, 700); }, sec * 1000);
+  }
+  function birdLeave(now) { B.q = []; const el = $('bird'); el.querySelector('.bub').classList.remove('show'); if (el.classList.contains('in')) { el.classList.add('out'); el.classList.remove('in'); setTimeout(() => el.classList.remove('out'), 1200); } if (now) B.busy = false; }
+
+  /* ---------- 音楽のパネル ---------- */
+  let storyHist = [], storyTab = 0, storyPick = null;
+  function storyHtml(id, withSrc) {
+    const n = NOTES[id], p = PL.PIECES.find(q => q.id === id) || {};
+    const lic = p.lic ? PL.LICENSES[p.lic] : null;
+    const head = `<h4>${esc(p.t || '')}<small>${esc(p.c || '')}${PL.moodOf(p) ? '・' + esc(moodName(PL.moodOf(p))) : ''}</small></h4>` + (lic ? `<div class="lic">${esc(lic.name)}・楽譜の入力：${esc(p.by)}（Mutopia Project）</div>` : '');
+    if (!n) return head + '<p class="muted">この曲の話は、まだありません（資料で確かめられたことだけを書いているため）。</p>';
+    const body = (n.d && n.d.length ? n.d : n.f).map(t => '<p>' + esc(t) + '</p>').join('');
+    return head + body + `<div class="src">出典：${n.src.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(host(u))}</a>`).join('、')}</div>`;
+  }
+  function renderMusicPop() {
+    const following = PL.following, st = PL.state();
+    pops.music.classList.toggle('locked', following);
+    $('pmNow').textContent = st.playing ? '再生中' : '一時停止中';
+    const ids = []; if (storyPick) ids.push(['えらんだ曲', storyPick]); if (curId) ids.push(['いまの曲', curId]); if (storyHist[0]) ids.push(['ひとつ前の曲', storyHist[0]]); if (storyHist[1]) ids.push(['ふたつ前', storyHist[1]]);
+    storyTab = Math.min(storyTab, Math.max(0, ids.length - 1));
+    $('pmStory').innerHTML = (ids.length > 1 ? `<div class="tabs">${ids.map(([l], i) => `<button data-st="${i}" class="${i === storyTab ? 'on' : ''}">${l}</button>`).join('')}</div>` : '') + (ids.length ? storyHtml(ids[storyTab][1]) : '<p class="muted">曲を用意しています…</p>');
+    renderMoods(); renderSongs();
+  }
+  $('pmStory').addEventListener('click', e => { const b = e.target.closest('[data-st]'); if (b) { storyTab = +b.dataset.st; renderMusicPop(); } });
+
+  /* ---------- 景色のパネル ---------- */
+  function renderScenePop() {
+    const following = ST.following, info = ST.info();
+    pops.scene.classList.toggle('locked', following);
+    const auto = P.get('scene') === 'auto';
+    $('psNow').textContent = info ? info.name + '・' + info.tod + '・' + info.weather : '';
+    $('psMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.mode === 'auto') === auto));
+    $('psInt').style.display = auto ? '' : 'none';
+    const list = $('psList');
+    if (!list.children.length) {
+      list.innerHTML = A.SCENES.map(d => `<button data-scene="${d.id}"><span>${d.name}</span></button>`).join('');
+      // 小さな絵は1枚ずつ、間をあけて描く（開いた瞬間に固まらないように）
+      let i = 0; const step = () => { const b = list.children[i++]; if (!b) return; const cv = ST.thumb(b.dataset.scene, 150, 96); if (cv) b.prepend(cv); setTimeout(step, 30); }; setTimeout(step, 60);
+    }
+    list.querySelectorAll('[data-scene]').forEach(b => b.classList.toggle('on', info && b.dataset.scene === info.id));
+    updLeft();
+  }
+  function updLeft() { const r = ST.remaining(); $('psLeft').textContent = r === null ? '' : r < 60 ? 'まもなく次の景色へ' : '次の景色まで あと' + Math.ceil(r / 60) + '分'; }
+  setInterval(() => { if (pops.scene.classList.contains('open')) updLeft(); }, 5000);
+  $('psMode').addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]'); if (!b || ST.following) return;
+    if (b.dataset.mode === 'auto') { if (!+P.get('interval')) P.set('interval', 10); P.set('scene', 'auto'); toast(P.get('interval') + '分ごとに景色が替わります'); }
+    else { const i = ST.info(); if (i) P.set('scene', i.id); toast('この景色のままにします'); }
+    renderScenePop();
+  });
+  $('psList').addEventListener('click', e => {
+    const b = e.target.closest('[data-scene]'); if (!b) return;
+    if (ST.following) return guestSay();
+    if (P.get('scene') === 'auto') ST.pick(b.dataset.scene); else P.set('scene', b.dataset.scene);
+    setTimeout(renderScenePop, 50);
+  });
+  P.on('interval', () => setTimeout(updLeft, 30));
+  ST.on(() => { if (pops.scene.classList.contains('open')) renderScenePop(); });
+
   setInterval(() => { const st = PL.state(); $('prog').firstElementChild.style.width = st.dur ? Math.min(100, st.pos / st.dur * 100) + '%' : '0'; }, 500);
   ST.on(i => { if (!i) return; $('where').innerHTML = i.name + '<small>' + i.tod + '・' + i.weather + '</small>'; });
 
@@ -502,9 +641,6 @@
     el.onclick = () => { P.set(key, !P.get(key)); sync(); }; sync();
   });
   document.querySelectorAll('[data-range]').forEach(el => { const key = el.dataset.range; el.value = P.get(key); el.oninput = () => P.set(key, +el.value); });
-  const sceneSel = document.querySelector('[data-select=scene]');
-  sceneSel.innerHTML = '<option value="auto">いろいろ巡る</option>' + A.SCENES.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  document.querySelectorAll('[data-select]').forEach(el => { const key = el.dataset.select; el.value = P.get(key); el.onchange = () => P.set(key, el.value); });
 
   /* ---------- 曲の一覧 ---------- */
   function renderSongs() {
@@ -517,7 +653,7 @@
     const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     box.innerHTML = Object.entries(groups).map(([g, list]) => `
       <div class="grp"><span>${PL.GROUP_NAME[g] || g}（${list.length}曲）</span><span><button data-all="${g}" data-on="1">全部オン</button> ・ <button data-all="${g}" data-on="0">全部オフ</button></span></div>
-      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${moodTag(p)}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span>${NOTES[p.id] ? `<button class="info" data-info="${p.id}" aria-label="この曲のこと">i</button>` : ''}<button class="play" data-play="${p.id}">流す</button></label>${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
+      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${moodTag(p)}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span>${NOTES[p.id] ? `<button class="info" data-info="${p.id}" aria-label="この曲の話を読む">話</button>` : ''}<button class="play" data-play="${p.id}">流す</button></label>${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
   }
   const NOTES = window.CHILL_NOTES || {};
   // 気分：明るさ×勢いの6つ。色は 明るい=暖色、暗い=寒色、勢いが強いほど濃く
@@ -548,8 +684,8 @@
   $('songQ').addEventListener('input', renderSongs);
   function markCur() { document.querySelectorAll('.song').forEach(el => el.classList.toggle('cur', el.dataset.id === curId)); }
   $('songs').addEventListener('click', e => {
-    const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); if (!PL.allowed(PL.PIECES.find(p => p.id === pl.dataset.play))) { toast('「表示が必要な曲も流す」がオフになっています'); return; } PL.playPiece(pl.dataset.play); return; }
-    const ib = e.target.closest('[data-info]'); if (ib) { e.preventDefault(); openStory(ib.dataset.info); return; }
+    const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); if (PL.following) return guestSay(); if (!PL.allowed(PL.PIECES.find(p => p.id === pl.dataset.play))) { toast('「表示が必要な曲も流す」がオフになっています'); return; } PL.playPiece(pl.dataset.play); return; }
+    const ib = e.target.closest('[data-info]'); if (ib) { e.preventDefault(); storyPick = ib.dataset.info; storyTab = 0; renderMusicPop(); pops.music.scrollTop = 0; return; }
     const lb = e.target.closest('[data-lic]'); if (lb) { e.preventDefault(); const box = $('li-' + lb.dataset.lic); box.classList.toggle('open'); lb.classList.toggle('on', box.classList.contains('open')); return; }
     const all = e.target.closest('[data-all]');
     if (all) { const g = all.dataset.all, on = all.dataset.on === '1', off = new Set(P.get('off') || []); PL.PIECES.filter(p => p.g === g).forEach(p => on ? off.delete(p.id) : off.add(p.id)); P.set('off', [...off]); renderSongs(); }
@@ -561,12 +697,22 @@
     P.set('off', [...off]);
   });
 
-  /* ---------- 画面 ---------- */
+  /* ---------- 画面をつけたままにする ---------- */
+  // ふつうは Screen Wake Lock を使う。iPhone・iPad のホーム画面アプリでは iPadOS 18.4 より前だと効かないので、
+  // 見えない小さな無音の動画をくり返し流して、画面が消えないようにする（ボタンを押したときにだけ始められる）
   let lock = null;
+  const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document;
+  const vid = $('keepAwake');
   async function wake() {
-    try { if (P.get('wake') && 'wakeLock' in navigator && !document.hidden) { if (!lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } } else if (lock) { lock.release(); lock = null; } } catch (e) {}
+    const want = P.get('wake') && started && !document.hidden;
+    if (!want) { if (lock) { try { lock.release(); } catch (e) {} lock = null; } if (!vid.paused) vid.pause(); return; }
+    let ok = false;
+    try { if ('wakeLock' in navigator) { if (!lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; if (P.get('wake') && !document.hidden) setTimeout(wake, 500); }); } ok = true; } } catch (e) { ok = false; }
+    if (!ok || isApple) { try { const r = vid.play(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
   }
-  P.on('wake', wake); document.addEventListener('visibilitychange', wake);
+  P.on('wake', v => { wake(); if (v) toast('画面をつけたままにします'); });
+  document.addEventListener('visibilitychange', wake);
+  window.addEventListener('pointerdown', () => { if (P.get('wake') && started && (vid.paused || !lock)) wake(); }, { passive: true });
   $('bFull').onclick = () => { const d = document; try { if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d); else { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen).call(el); } } catch (e) { toast('このブラウザでは全画面にできません。ホーム画面に追加すると全画面で開けます'); } };
   function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2600); }
   P.on('cc', v => {
@@ -579,7 +725,7 @@
   const AV = window.TookuAvatar, RM = window.TookuRoom;
   const av = () => AV.mine();
   const setAv = patch => P.set('av', Object.assign(av(), patch));
-  const openRoom = () => { $('sheet').classList.remove('open'); $('room').classList.add('open'); $('shade').classList.add('open'); $('bRoom').classList.remove('unread'); syncAv(); renderRoom(RM.state()); };
+  const openRoom = () => { closePops(); $('sheet').classList.remove('open'); $('room').classList.add('open'); $('shade').classList.add('open'); $('bRoom').classList.remove('unread'); syncAv(); renderRoom(RM.state()); };
   $('bRoom').onclick = openRoom;
   $('rClose').onclick = closeSheet;
   // 見た目の選択肢
@@ -677,6 +823,7 @@
     }
   }
   RM.on(renderRoom); RM.on(renderChat);
+  RM.on(st => { document.body.classList.toggle('guest', st.role === 'guest'); if (pops.scene.classList.contains('open')) renderScenePop(); if (pops.music.classList.contains('open')) renderMusicPop(); });
   window.addEventListener('tooku-toast', e => toast(e.detail));
   window.addEventListener('tooku-chat', e => { if (!e.detail.sys && P.get('chatMin')) $('chatOpen').classList.add('unread'); });
 })();

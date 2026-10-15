@@ -176,7 +176,11 @@
     enter(def, chooseWeather(def), false);
     sceneStart = Date.now();
   }
-  function next() { const pref = P.get('scene'); go(pref === 'auto' ? pickNext() : pref); }
+  function next() { if (forced) return false; const pref = P.get('scene'); go(pref === 'auto' ? pickNext() : pref); return true; }
+  // 景色の一覧から選んだとき（部屋でホストに合わせているときは選べない）
+  function pick(id) { if (forced) return false; go(id); return true; }
+  // 次の景色に替わるまでの残り（秒）。替わらない設定なら null
+  function remaining() { const min = +P.get('interval'); if (forced || P.get('scene') !== 'auto' || !min || Q.get('scene')) return null; return Math.max(0, min * 60 - (Date.now() - sceneStart) / 1000); }
   function schedule() {
     clearInterval(timer);
     timer = setInterval(() => {
@@ -211,11 +215,34 @@
     const first = Q.get('scene') || (P.get('scene') !== 'auto' ? P.get('scene') : pickNext());
     go(first, { instant: true });
     schedule();
-    P.on('scene', () => { if (!forced) next(); });
+    P.on('scene', v => { if (!forced && v !== 'auto' && (!cur || cur.def.id !== v)) go(v); sceneStart = Date.now(); });
     P.on('weather', () => { if (cur && !forced) enter(cur.def, chooseWeather(cur.def), false); });
     P.on('tod', () => { if (cur && !forced) { cur.randHour = undefined; enter(cur.def, cur.weatherKey, true); if (P.get('tod') === 'random') enter(cur.def, cur.weatherKey, false); } });
     P.on('interval', () => { sceneStart = Date.now(); });
     requestAnimationFrame(loop);
+  }
+  // 景色の一覧に出す小さな絵（その景色の昼・晴れを1枚だけ描く）
+  const thumbs = new Map();
+  function thumb(id, w, h) {
+    const key = id + w + 'x' + h; if (thumbs.has(key)) return thumbs.get(key);
+    const def = A.SCENES.find(d => d.id === id); if (!def) return null;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    try {
+      const g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+      let seed = 7; for (const ch of id) seed = (seed * 31 + ch.charCodeAt(0)) | 0;
+      const weather = def.weather.clear !== undefined ? 'clear' : Object.keys(def.weather)[0];
+      const env = E.makeEnv(w, h, id === 'summit' || id === 'desert' ? 17.6 : 12.5, weather, seed), rng = RNG(seed);
+      env.hz = def.horizon(env); env.skyState = { stars: E.makeStars(env, Math.round(w * h / 60)), moon: null };
+      const s = (def.init ? def.init(env, rng) : {}) || {}, T = E.tools(g);
+      E.drawSky(T, env, env.skyState, 0, env.hz, { milky: def.milky });
+      if (def.skyExtra) def.skyExtra(T, env, s, 0, 0);
+      if (def.clouds !== false) E.drawClouds(T, env, E.makeClouds(env, Math.round(w / 45), env.hz * (def.cloudTop || 0.55), RNG(seed + 3)), 0, 0.92);
+      if (def.back) def.back(T, env, s, 0, 0.06);
+      const tc = document.createElement('canvas'); tc.width = w; tc.height = h; const tg = tc.getContext('2d'); tg.imageSmoothingEnabled = false;
+      def.build(E.tools(tg), env, s); g.drawImage(tc, 0, 0);
+      if (def.front) def.front(T, env, s, 0, 0.06);
+    } catch (e) { console.warn(e); }
+    thumbs.set(key, cv); return cv;
   }
   // 今の景色を、ほかの人に送れる形で
   function snapshot() { return cur ? { id: cur.def.id, weather: cur.weatherKey, hour: Math.round(currentHour() * 100) / 100, seed: cur.seed } : null; }
@@ -231,7 +258,7 @@
   }
   function unfollow() { if (!forced) return; forced = null; sceneStart = Date.now(); if (cur) enter(cur.def, cur.weatherKey, false); }
   window.TookuStage = {
-    init, next, go, info, snapshot, follow, unfollow, get following() { return !!forced; },
+    init, next, go, pick, remaining, thumb, info, snapshot, follow, unfollow, get following() { return !!forced; },
     addOverlay: f => overlays.push(f), on: f => { listeners.add(f); return () => listeners.delete(f); },
     setRunning: v => { running = v; },
     // 確認用：時間を進めて1枚描く

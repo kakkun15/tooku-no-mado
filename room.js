@@ -3,7 +3,7 @@
    部屋の機能を使うまでは、外のサーバーには一切つながない。 */
 (function () {
   'use strict';
-  const P = window.TOOKU_PREFS, ST = window.TookuStage, AV = window.TookuAvatar;
+  const P = window.TOOKU_PREFS, ST = window.TookuStage, AV = window.TookuAvatar, PL = window.TookuPlayer;
   const PREFIX = 'tooku-no-mado-', MAX = 8, CHAT_MAX = 80;
   const ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const R = { peer: null, role: null, code: '', myId: '', conns: new Map(), names: new Map(), host: null, leaving: false, log: [], rate: new Map() };
@@ -86,7 +86,7 @@
       const a = AV.sanitize(d.a), isNew = !R.names.has(id);
       R.names.set(id, a); AV.setPerson(id, a);
       const members = { [R.myId]: AV.mine() }; for (const [k, v] of R.names) members[k] = v;
-      send(conn, { t: 'welcome', you: id, host: R.myId, members, scene: ST.snapshot() });
+      send(conn, { t: 'welcome', you: id, host: R.myId, members, scene: ST.snapshot(), music: PL.syncState() });
       toAll({ t: 'me', id, a }, id);
       if (isNew) addLog(id, nameOf(id) + ' さんが来ました', true);
       emit();
@@ -142,6 +142,7 @@
     if (d.t === 'welcome') {
       for (const [id, a] of Object.entries(d.members || {})) if (id !== R.myId) { const s = AV.sanitize(a); R.names.set(id, s); AV.setPerson(id, s); }
       if (d.scene) ST.follow(d.scene);
+      if (d.music) PL.follow(d.music);
       emit();
     } else if (d.t === 'me' && d.id && d.id !== R.myId) {
       const a = AV.sanitize(d.a), isNew = !R.names.has(d.id); R.names.set(d.id, a); AV.setPerson(d.id, a);
@@ -151,6 +152,7 @@
     } else if (d.t === 'chat' && d.id && d.id !== R.myId) {
       const text = cleanText(d.text); if (text) addLog(d.id, text);
     } else if (d.t === 'scene' && d.s) ST.follow(d.s);
+    else if (d.t === 'music' && d.m) PL.follow(d.m);
   }
   function hostLost() {
     if (R.leaving || R.role !== 'guest') return;
@@ -165,7 +167,7 @@
     R.names.clear(); R.conns.clear(); R.rate.clear();
     try { if (R.peer) R.peer.destroy(); } catch (e) {}
     R.peer = null; R.host = null; R.role = null; R.code = ''; R.busy = '';
-    ST.unfollow();
+    ST.unfollow(); PL.unfollow();
   }
   function leave() {
     if (!R.role) return;
@@ -198,6 +200,10 @@
   let scT = 0;
   const pushScene = () => { if (R.role === 'host') { clearTimeout(scT); scT = setTimeout(() => toAll({ t: 'scene', s: ST.snapshot() }), 300); } };
   ST.on(pushScene); setInterval(pushScene, 60000);
+  // ホストの曲も配る：曲が変わった・止めた・流したときと、ずれ直しのために15秒ごと
+  let muKey = '', muT = 0;
+  const pushMusic = force => { if (R.role !== 'host') return; const m = PL.syncState(); if (!m) return; const k = m.id + m.family + m.playing; if (!force && k === muKey) return; muKey = k; clearTimeout(muT); muT = setTimeout(() => toAll({ t: 'music', m: PL.syncState() }), 150); };
+  PL.on(() => pushMusic(false)); setInterval(() => pushMusic(true), 15000);
 
   /* ---------- わかりやすいエラー ---------- */
   function friendly(e) {

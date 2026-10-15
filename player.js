@@ -117,8 +117,10 @@
   }
   async function prepare(id, family) {
     const piece = PIECES.find(p => p.id === id); if (!piece) return null;
-    family = family || pickFamily(piece);
-    const bg = P.get('mode') === 'bg', opt = { family, slow: !!P.get('slow'), calm: isCalm(piece), seed: Math.random() * 1000 | 0 };
+    // みんなの窓のゲスト：ホストと同じ音色・速さで作る（同じ長さになるように）
+    const F = S.follow && S.follow.id === id ? S.follow : null;
+    family = F ? F.family : family || pickFamily(piece);
+    const bg = P.get('mode') === 'bg', opt = { family, slow: F ? !!F.slow : !!P.get('slow'), calm: F ? !!F.calm : isCalm(piece), seed: F ? F.seed : Math.random() * 1000 | 0 };
     const r = await renderJob(piece, opt, bg);
     const item = { piece, family, dur: r.dur, bg, opt };
     if (bg) { item.wav = r.wav; item.url = wavUrl(r.wav); }
@@ -171,12 +173,13 @@
   }
   let prefetching = null;
   function prefetch() {
-    if (S.next || prefetching || !S.cur) return;
+    if (S.next || prefetching || !S.cur || S.follow) return;
     const gen = S.gen, id = nextId(S.cur.piece.id);
     if (!id) return;
     prefetching = prepare(id).then(it => { if (gen === S.gen && !S.next) S.next = it; else release(it); }).catch(() => {}).finally(() => { prefetching = null; });
   }
   async function advance() {
+    if (S.follow) { S.playing = false; S.offset = S.cur ? S.cur.dur : 0; emit(); return; }   // ゲストは、ホストの次の曲を待つ
     history.push(S.cur && S.cur.piece.id); if (history.length > 50) history.shift();
     if (S.next) { release(S.cur); S.cur = S.next; S.next = null; startCurrent(0); return; }
     if (prefetching) { S.loading = true; emit(); await prefetching; S.loading = false; if (S.next) return advance(); }
@@ -219,14 +222,14 @@
     if (S.cur.bg) el.pause(); else stopSource();
     emit();
   }
-  function toggle() { S.playing ? pause() : play(); }
-  function skip() { unlock(); if (S.loading) return; if (S.cur) { stopSource(); if (S.cur.bg) el.pause(); } advance(); }
+  function toggle() { if (S.follow) return followToggle(); S.playing ? pause() : play(); }
+  function skip() { unlock(); if (S.loading || S.follow) return; if (S.cur) { stopSource(); if (S.cur.bg) el.pause(); } advance(); }
   function prev() {
-    unlock();
+    unlock(); if (S.follow) return;
     if (position() > 5 || !history.length) { if (S.cur) startCurrent(0); return; }
     const id = history.pop(); if (id) playId(id);
   }
-  function playPiece(id) { unlock(); playId(id); }
+  function playPiece(id) { unlock(); if (S.follow) return; playId(id); }
   // 音色・速さ・方式が変わったら、今の曲をその位置から作り直す
   function rebuild(keepFamily) {
     if (!S.cur) return;
@@ -236,9 +239,9 @@
     if (S.next) { release(S.next); S.next = null; }
     playId(id, fam, d => ratio * d, !wasPlaying);
   }
-  P.on('timbre', () => rebuild(false));
-  P.on('slow', () => rebuild(true));
-  P.on('calm', () => { if (S.next && DARK.has(S.next.piece.id)) { release(S.next); S.next = null; prefetch(); } if (S.cur && DARK.has(S.cur.piece.id)) { const ratio = position() / Math.max(1, S.cur.dur); playId(S.cur.piece.id, undefined, d => ratio * d, !S.playing); } });
+  P.on('timbre', () => { if (!S.follow) rebuild(false); });
+  P.on('slow', () => { if (!S.follow) rebuild(true); });
+  P.on('calm', () => { if (S.follow) return; if (S.next && DARK.has(S.next.piece.id)) { release(S.next); S.next = null; prefetch(); } if (S.cur && DARK.has(S.cur.piece.id)) { const ratio = position() / Math.max(1, S.cur.dur); playId(S.cur.piece.id, undefined, d => ratio * d, !S.playing); } });
   P.on('mode', () => { applyVolumes(); unlock(); rebuild(true); });
   let volT = 0;
   P.on('vol', () => { applyVolumes(); if (FIXED_VOL && P.get('mode') === 'bg') { clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 350); } });
@@ -350,7 +353,30 @@
     sampleEnd = t0 + 1.4;
   }
 
+  /* ---------- みんなの窓：ホストの曲に合わせる ---------- */
+  // ホストが配る今の曲（同じ曲を、同じ音色・速さ・同じところから）
+  function syncState() { const c = S.cur; return c ? { id: c.piece.id, family: c.family, slow: !!(c.opt && c.opt.slow), calm: !!(c.opt && c.opt.calm), seed: c.opt ? c.opt.seed : 0, pos: Math.round(position() * 10) / 10, playing: S.playing } : null; }
+  let userPaused = false;
+  function follow(m) {
+    if (!m || !PIECES.some(p => p.id === m.id) || !FAMILY_NAME[m.family]) return;
+    S.follow = { id: m.id, family: m.family, slow: !!m.slow, calm: !!m.calm, seed: m.seed | 0, pos: Math.max(0, +m.pos || 0), playing: !!m.playing, recv: performance.now() };
+    applyFollow();
+  }
+  const expected = () => { const F = S.follow; return F.pos + (F.playing ? (performance.now() - F.recv) / 1000 : 0); };
+  function applyFollow() {
+    const F = S.follow; if (!F) return;
+    const c = S.cur, same = c && c.piece.id === F.id && c.family === F.family && !!c.opt.slow === F.slow;
+    if (!same) { if (S.loading && S.want === F.id + F.family) return; S.want = F.id + F.family; playId(F.id, F.family, () => expected(), !F.playing || userPaused); return; }
+    if (userPaused) return;
+    if (F.playing && !S.playing) startCurrent(expected());
+    else if (!F.playing && S.playing) pause();
+    else if (F.playing && Math.abs(position() - expected()) > 2.5) startCurrent(expected());
+  }
+  function unfollow() { if (!S.follow) return; const up = userPaused; S.follow = null; userPaused = false; S.want = null; if (S.cur && !S.playing && !up) play(); prefetch(); }
+  const followToggle = () => { if (S.playing) { userPaused = true; pause(); } else { userPaused = false; unlock(); applyFollow(); if (!S.playing && S.cur && S.follow.playing) startCurrent(expected()); } };
+
   window.TookuPlayer = {
+    syncState, follow, unfollow, get following() { return !!S.follow; },
     sample,
     PIECES, DARK, FAMILY_NAME, GROUP_NAME, moodOf, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
