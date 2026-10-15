@@ -24,8 +24,14 @@
       document.body.appendChild(probe);
     }
     const r = probe.getBoundingClientRect(), vv = window.visualViewport;
-    const w = Math.max(window.innerWidth, document.documentElement.clientWidth, r.width, vv ? vv.width * vv.scale : 0);
-    const h = Math.max(window.innerHeight, document.documentElement.clientHeight, r.height, vv ? vv.height * vv.scale : 0);
+    let w = Math.max(window.innerWidth, document.documentElement.clientWidth, r.width, vv ? vv.width * vv.scale : 0);
+    let h = Math.max(window.innerHeight, document.documentElement.clientHeight, r.height, vv ? vv.height * vv.scale : 0);
+    // ホーム画面から開いたとき（全画面）は、画面そのものの大きさも見る。iPad では高さが下の余白ぶん短く報告されることがある
+    const standalone = navigator.standalone || (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+    if (standalone && window.screen) {
+      const a = screen.width, b = screen.height, land = w > h;
+      w = Math.max(w, land ? Math.max(a, b) : Math.min(a, b)); h = Math.max(h, land ? Math.min(a, b) : Math.max(a, b));
+    }
     return [Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h))];
   }
   function fit() {
@@ -168,6 +174,16 @@
     window.addEventListener('pageshow', refit);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { refit(); setTimeout(fit, 700); } });
     if (window.visualViewport) window.visualViewport.addEventListener('resize', refit);
+    // それでも景色の外にすき間ができたときに目立たないよう、ページの地の色を景色のいちばん下の色に合わせる
+    setInterval(() => {
+      if (!vg || !W || !H) return;
+      try {
+        const d = vg.getImageData(0, H - 1, W, 1).data; let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < d.length; i += 16) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+        const c = `rgb(${r / n | 0},${g / n | 0},${b / n | 0})`;
+        document.documentElement.style.background = c; document.body.style.background = c;
+      } catch (e) {}
+    }, 2000);
     // 大きさの通知が来ないまま変わることもあるので、ときどき確かめる（ずれていなければ何もしない）
     setInterval(() => { const [cw, ch] = screenSize(); if (Math.ceil(cw / scale) !== W || Math.ceil(ch / scale) !== H) fit(); }, 1500);
     const first = Q.get('scene') || (P.get('scene') !== 'auto' ? P.get('scene') : pickNext());

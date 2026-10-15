@@ -76,7 +76,11 @@
 
   /* ---------- 選曲 ---------- */
   // 表示が必要な曲（CC）を流すか。録画・配信のときはオフにする
-  const allowed = p => p.g !== 'cc' || P.get('cc') !== false;
+  const MOOD_OF = window.CHILL_MOOD_OF || {};
+  const moodOf = p => (MOOD_OF[p.id] || {}).m;
+  // 気分で絞る（何も選んでいなければ全部）
+  const moodOk = p => { const ms = P.get('moods') || []; return !ms.length || ms.includes(moodOf(p)); };
+  const allowed = p => (p.g !== 'cc' || P.get('cc') !== false) && moodOk(p);
   const enabledIds = () => { const off = new Set(P.get('off') || []); return PIECES.filter(p => !off.has(p.id) && allowed(p)).map(p => p.id); };
   let bag = [], history = [];
   function nextId(after) {
@@ -239,6 +243,7 @@
   let volT = 0;
   P.on('vol', () => { applyVolumes(); if (FIXED_VOL && P.get('mode') === 'bg') { clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 350); } });
   P.on('amb', applyVolumes);
+  P.on('moods', () => { if (S.next && !allowed(S.next.piece)) { release(S.next); S.next = null; prefetch(); } });
   P.on('cc', v => {
     if (S.next && !allowed(S.next.piece)) { release(S.next); S.next = null; prefetch(); }
     if (!v && S.cur && !allowed(S.cur.piece) && enabledIds().length) skip();   // 録画の直前に切り替えることが多いので、すぐ次の曲へ
@@ -347,7 +352,7 @@
 
   window.TookuPlayer = {
     sample,
-    PIECES, DARK, FAMILY_NAME, GROUP_NAME, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
+    PIECES, DARK, FAMILY_NAME, GROUP_NAME, moodOf, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
     setAmbience: kinds => { if (ac) setAmbience(kinds); else AMB.pending = kinds; },
     startAmbience: () => { ensureAC(); if (AMB.pending) { const k = AMB.pending; AMB.pending = null; AMB.kinds = ''; setAmbience(k); } },

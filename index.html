@@ -161,6 +161,11 @@
   #note.show { opacity: 1; transform: translate(-50%, 0); }
   #note .hd { font-size: 11.5px; color: var(--accent); margin-bottom: 2px; letter-spacing: .05em; }
   #note a { color: var(--dim); font-size: 11px; margin-left: 6px; pointer-events: auto; }
+  .song .mood { font-size: 10.5px; padding: 0 5px; border-radius: 6px; margin-left: 6px; white-space: nowrap; color: #1d1a16; }
+  .moods { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 10px; }
+  .moods button { padding: 6px 10px; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); color: var(--dim); }
+  .moods button.on { color: #1d1a16; border-color: transparent; }
+  .moods button small { opacity: .75; margin-left: 4px; font-size: 11px; }
   .song .info { font-size: 12px; color: var(--dim); padding: 2px 6px; flex: none; border: 1px solid var(--line); border-radius: 6px; }
   .songnote { display: none; font-size: 12.5px; color: var(--ink); line-height: 1.7; padding: 6px 4px 10px 30px; border-bottom: 1px solid rgba(255,255,255,.06); }
   .songnote.open { display: block; }
@@ -224,6 +229,10 @@
   <div class="row"><div>画面をつけたままにする<span class="help">対応しているブラウザだけ</span></div><button class="switch" data-switch="wake" aria-label="画面をつけたままにする"></button></div>
   <div class="row"><div>なめらかさ<span class="help">低いほど電池にやさしい</span></div><div class="seg" data-pref="fps" data-opts="8:低,15:ふつう,24:高"></div></div>
   <div class="row"><div>全画面</div><button class="seg" id="bFull"><span style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">切り替え</span></button></div>
+
+  <h3>気分で選ぶ</h3>
+  <div class="muted">押した気分の曲だけが流れます（何も選ばなければ全部）。気分は、曲の音符から自動で分析したものです。</div>
+  <div class="moods" id="moods"></div>
 
   <h3>曲（チェックを外すと流れません）</h3>
   <input class="txt" id="songQ" type="search" placeholder="曲名・作曲者でさがす（例：ブランデンブルク）" autocomplete="off" style="width:100%;margin:2px 0 4px">
@@ -305,6 +314,7 @@
 <script src="music-cc.js"></script>
 <script src="music-mine.js"></script>
 <script src="notes.js"></script>
+<script src="moods.js"></script>
 <script src="synth.js"></script>
 <script src="player.js"></script>
 <script src="engine.js"></script>
@@ -359,7 +369,7 @@
   $('bNext').onclick = () => PL.skip();
   $('bPrev').onclick = () => PL.prev();
   $('bScene').onclick = () => { ST.next(); };
-  const openSheet = () => { $('room').classList.remove('open'); $('sheet').classList.add('open'); $('shade').classList.add('open'); renderSongs(); };
+  const openSheet = () => { $('room').classList.remove('open'); $('sheet').classList.add('open'); $('shade').classList.add('open'); renderMoods(); renderSongs(); };
   const closeSheet = () => { $('sheet').classList.remove('open'); $('room').classList.remove('open'); $('shade').classList.remove('open'); poke(); };
   $('bSet').onclick = openSheet;
   $('bClose').onclick = closeSheet;
@@ -377,7 +387,7 @@
   PL.on(st => {
     $('bPlay').textContent = st.playing ? '❚❚' : '▶';
     if (st.loading && !st.piece) { $('nT').textContent = '曲を用意しています…'; $('nS').textContent = ''; }
-    else if (st.piece) { $('nT').textContent = st.piece.t; $('nS').textContent = st.piece.c + '・' + st.familyName + (st.loading ? '・次を用意中…' : ''); }
+    else if (st.piece) { $('nT').textContent = st.piece.t; $('nS').textContent = st.piece.c + '・' + (PL.moodOf(st.piece) ? moodName(PL.moodOf(st.piece)) + '・' : '') + st.familyName + (st.loading ? '・次を用意中…' : ''); }
     if (st.piece && st.piece.id !== curId) { curId = st.piece.id; markCur(); }
     const lic = st.piece && st.piece.lic ? PL.LICENSES[st.piece.lic] : null;
     $('nL').textContent = lic ? lic.name + '・楽譜の入力：' + st.piece.by + '（Mutopia Project）' : '';
@@ -434,9 +444,25 @@
     const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     box.innerHTML = Object.entries(groups).map(([g, list]) => `
       <div class="grp"><span>${PL.GROUP_NAME[g] || g}（${list.length}曲）</span><span><button data-all="${g}" data-on="1">全部オン</button> ・ <button data-all="${g}" data-on="0">全部オフ</button></span></div>
-      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span>${NOTES[p.id] ? `<button class="info" data-info="${p.id}" aria-label="この曲のこと">i</button>` : ''}<button class="play" data-play="${p.id}">流す</button></label>${NOTES[p.id] ? noteInfo(p) : ''}${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
+      ${list.map(p => `<label class="song${p.id === curId ? ' cur' : ''}${PL.allowed(p) ? '' : ' muted'}" data-id="${p.id}"><input type="checkbox" ${off.has(p.id) ? '' : 'checked'}><span class="nm">${p.t}${moodTag(p)}${p.lic ? `<button class="lic" data-lic="${p.id}">${PL.LICENSES[p.lic].name}</button>` : ''}<small>${p.c}・${fmt(p.s)}</small></span>${NOTES[p.id] ? `<button class="info" data-info="${p.id}" aria-label="この曲のこと">i</button>` : ''}<button class="play" data-play="${p.id}">流す</button></label>${NOTES[p.id] ? noteInfo(p) : ''}${p.lic ? licInfo(p) : ''}`).join('')}`).join('');
   }
   const NOTES = window.CHILL_NOTES || {};
+  // 気分：明るさ×勢いの6つ。色は 明るい=暖色、暗い=寒色、勢いが強いほど濃く
+  const MOODS = window.CHILL_MOODS || [];
+  const MOOD_COLOR = { yasuragu: '#f3e3b8', hogaraka: '#ffd07a', hazumu: '#ffa860', shinmiri: '#c4d2ec', monoomoi: '#a6b6e0', hageshii: '#d39ad0' };
+  const moodName = id => (MOODS.find(m => m.id === id) || {}).name || '';
+  const moodTag = p => { const m = PL.moodOf(p); return m ? `<span class="mood" style="background:${MOOD_COLOR[m]}">${moodName(m)}</span>` : ''; };
+  function renderMoods() {
+    const sel = new Set(P.get('moods') || []), counts = {};
+    for (const p of PL.PIECES) { const m = PL.moodOf(p); counts[m] = (counts[m] || 0) + 1; }
+    $('moods').innerHTML = MOODS.map(m => `<button data-mood="${m.id}" class="${sel.has(m.id) ? 'on' : ''}" style="${sel.has(m.id) ? 'background:' + MOOD_COLOR[m.id] : ''}" title="${m.help}">${m.name}<small>${counts[m.id] || 0}</small></button>`).join('');
+  }
+  $('moods').addEventListener('click', e => {
+    const b = e.target.closest('[data-mood]'); if (!b) return;
+    const sel = new Set(P.get('moods') || []); sel.has(b.dataset.mood) ? sel.delete(b.dataset.mood) : sel.add(b.dataset.mood);
+    P.set('moods', [...sel]); renderMoods(); renderSongs();
+    toast(sel.size ? [...sel].map(moodName).join('・') + ' の曲だけ流します' : '全部の気分の曲を流します');
+  });
   const host = u => { try { return decodeURIComponent(new URL(u).hostname.replace(/^www\./, '')); } catch (e) { return '出典'; } };
   function noteInfo(p) {
     const n = NOTES[p.id];
