@@ -74,7 +74,9 @@
   .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
   .row .help { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; line-height: 1.5; }
   .seg { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-  .seg button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+  .row.stack { flex-direction: column; align-items: stretch; }
+  .row.stack .seg { justify-content: flex-start; }
+  .seg button { white-space: nowrap; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
   .seg button.on { background: var(--accent); color: #2a1a08; border-color: var(--accent); }
   input[type=range] { width: 150px; accent-color: var(--accent); }
   select { font: inherit; font-size: 13px; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 200px; }
@@ -243,8 +245,8 @@
   <div class="row"><div>環境音<span class="help">焚き火・川・風・雨など</span></div><input type="range" min="0" max="100" data-range="amb"></div>
   <div class="row"><div>怖めの曲をやわらかく<span class="help">怒りの日・山の魔王の宮殿にて・トッカータとフーガなど7曲を、強弱と低音をおさえて、少しゆっくり、オルゴールかやさしい音色で流します（音の並びは変えません）</span></div><button class="switch" data-switch="calm" aria-label="怖めの曲をやわらかく"></button></div>
   <div class="row"><div>表示が必要な曲も流す<span class="help">クリエイティブ・コモンズ（CC）の曲です。録画や配信のときにオフにすると、表示のいらない曲だけが流れます</span></div><button class="switch" data-switch="cc" aria-label="表示が必要な曲も流す"></button></div>
-  <div class="row"><div>曲の小話<span class="help">曲が流れているあいだに、その曲の歴史や逸話を出します。「くわしく」は何段落かを順に、「短く」はひとことを2つまで。出し終わると上に「i」が残り、押せばいつでも全部読めます。どれも資料で確かめたことだけで、出典つき</span></div><div class="seg" data-pref="noteLen" data-opts="long:くわしく,short:短く,off:出さない"></div></div>
-  <div class="row"><div>小話の出し方<span class="help">アバターは「みんなの窓」でアバターを出しているときだけ。ふきだしで1文ずつ話します</span></div><div class="seg" data-pref="notes" data-opts="caption:字幕,avatar:アバター"></div></div>
+  <div class="row stack"><div>曲の小話<span class="help">曲が流れているあいだに、その曲の歴史や逸話を出します。「くわしく」は何段落かを順に、「短く」はひとことを2つまで。出し終わると上に「i」が残り、押せばいつでも全部読めます。どれも資料で確かめたことだけで、出典つき</span></div><div class="seg" data-pref="noteLen" data-opts="long:くわしく,short:短く,off:出さない"></div></div>
+  <div class="row stack"><div>小話の出し方<span class="help">アバターは「みんなの窓」でアバターを出しているときだけ。ふきだしで1文ずつ話します</span></div><div class="seg" data-pref="notes" data-opts="caption:字幕,avatar:アバター"></div></div>
   <div class="row"><div>曲の順番</div><div class="seg" data-pref="order" data-opts="shuffle:シャッフル,seq:順番"></div></div>
 
   <h3>景色</h3>
@@ -345,6 +347,7 @@
 <script src="music-cc.js"></script>
 <script src="music-mine.js"></script>
 <script src="notes.js"></script>
+<script src="notes-long.js"></script>
 <script src="moods.js"></script>
 <script src="synth.js"></script>
 <script src="player.js"></script>
