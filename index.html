@@ -215,6 +215,7 @@
   <div class="row"><div>全画面</div><button class="seg" id="bFull"><span style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">切り替え</span></button></div>
 
   <h3>曲（チェックを外すと流れません）</h3>
+  <input class="txt" id="songQ" type="search" placeholder="曲名・作曲者でさがす（例：ブランデンブルク）" autocomplete="off" style="width:100%;margin:2px 0 4px">
   <div class="songs" id="songs"></div>
 
   <div class="note">
@@ -392,7 +393,11 @@
   /* ---------- 曲の一覧 ---------- */
   function renderSongs() {
     const off = new Set(P.get('off') || []), box = $('songs'), groups = {};
-    for (const p of PL.PIECES) (groups[p.g] = groups[p.g] || []).push(p);
+    // カタカナ・ひらがな、全角・半角、大文字・小文字の違いは気にせずさがす
+    const norm = t => String(t).normalize('NFKC').toLowerCase().replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)).replace(/[\s・ー]/g, '');
+    const q = norm($('songQ').value || '');
+    for (const p of PL.PIECES) if (!q || norm(p.t + p.c).includes(q)) (groups[p.g] = groups[p.g] || []).push(p);
+    if (q && !Object.keys(groups).length) { box.innerHTML = '<p class="muted">見つかりませんでした</p>'; return; }
     const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     box.innerHTML = Object.entries(groups).map(([g, list]) => `
       <div class="grp"><span>${PL.GROUP_NAME[g] || g}（${list.length}曲）</span><span><button data-all="${g}" data-on="1">全部オン</button> ・ <button data-all="${g}" data-on="0">全部オフ</button></span></div>
@@ -406,6 +411,7 @@
       変更：楽譜を MIDI にして繰り返しを展開し、音符の並びに変換${p.note ? '。' + esc(p.note) : ''}<br>
       この曲の音符データ（music-cc.js）も同じライセンスで公開しています</div>`;
   }
+  $('songQ').addEventListener('input', renderSongs);
   function markCur() { document.querySelectorAll('.song').forEach(el => el.classList.toggle('cur', el.dataset.id === curId)); }
   $('songs').addEventListener('click', e => {
     const pl = e.target.closest('[data-play]'); if (pl) { e.preventDefault(); if (!PL.allowed(PL.PIECES.find(p => p.id === pl.dataset.play))) { toast('「表示が必要な曲も流す」がオフになっています'); return; } PL.playPiece(pl.dataset.play); return; }
