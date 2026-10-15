@@ -34,7 +34,24 @@
     for (const [bx, by, br] of blobs) T.circ(bx, by + 1, br, c1);
     for (const [bx, by, br] of blobs) T.circ(bx - 0.5, by - 0.5, Math.max(1, br - 1), c2);
     for (const [bx, by, br] of blobs) if (br > 2) T.circ(bx - br * 0.35, by - br * 0.4, Math.max(1, Math.round(br * 0.45)), c3);
-    if (opt.snow) for (const [bx, by, br] of blobs) T.R(bx - br * 0.6, by - br, br * 1.2, 1, env.col('#f2f6fb', depth));
+    // 雪：葉の塊の上側に、丸みに沿って帽子のように積もらせる（1本線にしない）
+    if (opt.snow) {
+      const sw = env.col('#f2f6fb', depth), ss = env.col('#d4dfec', depth);
+      for (const [bx, by, br] of blobs) {
+        const capH = br >= 2 ? Math.max(2, Math.round(br * 0.5)) : 1, cy0 = by - 0.5;
+        for (let dy = 0; dy < capH; dy++) {
+          const yy = Math.round(cy0 - br + 1 + dy), dd = br - 1 - dy, half = Math.sqrt(Math.max(0, br * br - dd * dd)) * (0.95 - dy * 0.08);
+          if (half < 0.6) continue;
+          // 下の段ほど細かく途切れさせて、溶けかけた縁にする
+          for (let xx = Math.round(bx - 0.5 - half); xx <= Math.round(bx - 0.5 + half); xx++) {
+            if (dy === capH - 1 && ((xx * 7 + yy * 3) & 3) === 0) continue;
+            // ほかの塊の内側（上にかぶさる葉の下）には積もらない
+            if (blobs.some(([ox, oy, or2]) => oy < by && (xx - ox) ** 2 + (yy - oy) ** 2 < (or2 - 0.5) ** 2)) continue;
+            T.P(xx, yy, dy === capH - 1 ? ss : sw);
+          }
+        }
+      }
+    }
   }
   /* ヤシの木 */
   function palm(T, env, x, base, h, depth, lean) {
@@ -98,6 +115,32 @@
     for (let i = 1; i <= n; i++) { const f = i / n, x = lerp(x0, x1, f), y = lerp(y0, y1, f) + sag * 4 * f * (1 - f); T.line(px, py, x, y, c); px = x; py = y; }
   }
 
+  /* 岩肌・崖・島の土台を塗る。ノイズの濃淡を数段の色に分け、境目だけ少しディザでぼかす。
+     ひびと小石を散らして、同じ模様がくり返して見えないようにする
+     o: { pal:[暗い→明るい], depth, seed, sx, sy, light(x,y) 明るさの足し引き, crack:色, speck:色 } */
+  function stoneFill(T, env, x0, x1, top, bot, o) {
+    const n = E.fbm2(o.seed || 1, 3), nc = E.noise2((o.seed || 1) + 7), sx = o.sx || 0.1, sy = o.sy || 0.25, pal = o.pal.map(c => env.col(c, o.depth || 0)), K = pal.length;
+    const crack = o.crack ? env.col(o.crack, o.depth || 0) : null, speck = o.speck ? env.col(o.speck, o.depth || 0) : null, g = T.g;
+    for (let x = Math.floor(x0); x < x1; x++) {
+      const yT = Math.round(top(x)), yB = Math.round(bot(x));
+      for (let y = Math.max(yT, -1); y < yB; y++) {
+        let v = n(x * sx, y * sy) * 1.35 - 0.18 + (o.light ? o.light(x, y) : 0);
+        const f = clamp(v, 0, 0.999) * K, i = Math.floor(f), fr = f - i;
+        let k = i + (fr > 0.72 && bay(x, y) < (fr - 0.72) / 0.28 ? 1 : 0);
+        k = Math.min(K - 1, k);
+        let c = pal[k];
+        if (crack && Math.abs(nc(x * 0.07, y * 0.16) - 0.5) < (o.crackW || 0.011)) c = crack;
+        else if (speck && ((x * 73 + y * 151) % 97) === 0) c = speck;
+        g.fillStyle = c; g.fillRect(x, y, 1, 1);
+      }
+    }
+  }
   function add(def) { SCENES.push(def); }
-  window.TookuArt = { SCENES, add, groundDepth, pine, leafy, palm, tuft, rock, birds, fireflies, windowLights, makeWindow, wire };
+  /* 雪の日：別に描いた絵の、上に何もない縁に雪を乗せる（景色の土台の絵と同じやり方） */
+  function snowEdges(g, env) {
+    const W = g.canvas.width, H = g.canvas.height, id = g.getImageData(0, 0, W, H), d = id.data, c = env.colRGB('#f4f8fc');
+    for (let y = H - 1; y >= 1; y--) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4, j = ((y - 1) * W + x) * 4; if (d[i + 3] > 200 && d[j + 3] < 40) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } }
+    g.putImageData(id, 0, 0);
+  }
+  window.TookuArt = { SCENES, add, stoneFill, groundDepth, pine, leafy, palm, tuft, rock, birds, fireflies, windowLights, makeWindow, wire, snowEdges };
 })();

@@ -54,8 +54,16 @@
       s.owl.x = s.cx + s.rx + 18 < W ? Math.round(s.cx + s.rx + 14) : Math.round(s.cx - s.rx - 16); s.owl.y = hz - 6;
       // 手前の草と、画面のふちの大きな木
       for (let x = 0; x < W; x += r.int(4, 9)) if (!snow) A.tuft(T, x, H - r.int(0, 3), r.int(2, 4), env.col('#4d7a3a'), env.col('#6b9a4a'));
-      const big = Math.round((H - hz) * 1.25);
-      A.pine(T, env, -2, H + 3, big, 0, { snow, wide: 0.34 }); A.pine(T, env, W + 1, H + 5, Math.round(big * 0.9), 0, { snow, wide: 0.34 });
+      // 画面の両はしの木：背を控えめにし、幹と根元がはっきり見えるように画面の内側へ寄せる
+      const big = Math.round((H - hz) * 0.66);
+      for (const [x, h, base] of [[Math.max(7, Math.round(W * 0.04)), big, H - 3], [W - Math.max(8, Math.round(W * 0.05)), Math.round(big * 0.88), H - 5]]) {
+        const trunkH = Math.round(h * 0.3), tw = h > 34 ? 3 : 2;
+        T.R(x - (tw >> 1), base - trunkH, tw, trunkH + 1, env.col('#4a3426'));
+        T.V(x - (tw >> 1), base - trunkH, trunkH, env.col('#6a4c36'));
+        T.P(x - (tw >> 1) - 1, base, env.col('#4a3426')); T.P(x + tw - (tw >> 1), base, env.col('#4a3426'));   // 根元
+        if (!snow) A.tuft(T, x, base + 1, 3, env.col('#4d7a3a'), env.col('#6b9a4a'));
+        A.pine(T, env, x, base - Math.round(trunkH * 0.7), h - Math.round(trunkH * 0.7), 0, { snow, wide: 0.36 });
+      }
       // テントのランタン
       s.lantern = { x: tx + tw - 3, y: ty - 6 };
       T.V(s.lantern.x, s.lantern.y - 2, 2, env.col('#3a3a3a')); T.R(s.lantern.x - 1, s.lantern.y, 3, 3, env.col('#4a4030')); T.P(s.lantern.x, s.lantern.y + 1, env.col('#e8c070'));
@@ -104,7 +112,7 @@
       const hw = v => 3 + W * 0.36 * Math.pow(v, 1.5);
       const xl = v => cen(v) - hw(v), xr = v => cen(v) + hw(v);
       const yv = v => top + (H - top) * v;
-      const streaks = []; for (let i = 0; i < W * 0.7; i++) streaks.push({ u: r(), v: r(), sp: 0.6 + r() * 0.6 });
+      const streaks = []; for (let i = 0; i < W * 0.45; i++) streaks.push({ u: r(), v: r(), sp: 0.6 + r() * 0.6, l: r() });
       const rocks = []; for (let i = 0; i < 5; i++) { const v = 0.3 + r() * 0.65, u = r() < 0.5 ? 0.08 + r() * 0.2 : 0.7 + r() * 0.22; rocks.push({ u, v, w: Math.round(2 + v * 5), h: Math.round(1 + v * 2) }); }
       return { hz, sx, top, xl, xr, yv, streaks, rocks, fish: null, nextFish: 15 + r() * 20, flies: [0, 1].map(() => ({ x: r() * W, y: H - 20 - r() * 15, vx: 0, vy: 0 })), ripples: [] };
     },
@@ -120,20 +128,38 @@
       T.poly([[fx - 10, ft + 1], [fx - 5, ft - 2], [fx + 6, ft - 2], [fx + 11, ft + 2], [fx + 6, ft], [fx - 5, ft]], env.col(snow ? '#eef2f8' : '#4e7a48', 0.3));
       T.line(fx - 9, ft + 4, fx - 7, hz + 2, env.col('#55595f', 0.3)); T.line(fx + 9, ft + 4, fx + 11, hz + 2, env.col('#55595f', 0.3));
       s.fall = { x: fx - 2, y: ft - 1, w: 5, h: hz + 4 - ft };
+      // 滝の形を印の色で塗っておき、あとで木に隠れずに残ったところだけに水を流す（木の上に水しぶきが乗らないように）
+      T.R(s.fall.x, s.fall.y, s.fall.w, s.fall.h, '#ff00fe');
       // 土手
       const bank = snow ? '#e8eef6' : '#5f8c46', bank2 = snow ? '#d4dee9' : '#6e9c52', mud = snow ? '#b8c2cc' : '#5c5240';
       T.R(0, hz + 3, W, H - hz, env.col(bank)); T.dith(0, hz + 3, W, H - hz - 3, env.col(bank), env.col(bank2), (i, j) => 0.3 + 0.25 * Math.sin(i * 0.11 + j * 0.2) * Math.sin(j * 0.05 + i * 0.02));
+      // 岸の草むらと花（木より先に描く。花は小さなかたまりで、木の上には乗らない）
+      if (!snow) for (let i = 0; i < W * (H - hz) / 90; i++) {
+        const y = hz + 6 + Math.pow(r(), 0.7) * (H - hz - 6), v = (y - s.top) / (H - s.top), x = r() * W;
+        if (x > s.xl(v) - 3 && x < s.xr(v) + 3) continue;
+        if (r() < 0.62) A.tuft(T, x, y, Math.round(2 + v * 3), env.col('#4d7a3a'), env.col('#72a24e'));
+        else { const fc = env.col(r.pick(['#f0d040', '#f0d040', '#e88aa8', '#b8a0e8', '#f4a060', '#f4f0e0'])), n2 = 1 + (v > 0.5 ? r.int(1, 3) : r.int(0, 1)); T.P(x, y + 1, env.col('#3f6a30')); for (let k = 0; k < n2; k++) T.P(x + r.int(-1, 1), y - r.int(0, 1), fc); }
+      }
       // 奥の木々を岸に沿って
       for (let k = 0; k < 9; k++) { const v = 0.04 + k * 0.035 + r() * 0.03, left = k % 2 === 0, x = left ? s.xl(v) - 6 - r() * W * 0.1 : s.xr(v) + 6 + r() * W * 0.1; if (r() < 0.5) A.pine(T, env, x, s.yv(v), 10 + v * 40, 0.25 - v * 0.5, { snow }); else A.leafy(T, env, x, s.yv(v), 10 + v * 36, 0.25 - v * 0.5, { snow }); }
       // 川の形（岸はぬれた土）
       const N = 60, L = [], R = [];
       for (let k = 0; k <= N; k++) { const v = k / N; L.push([s.xl(v), s.yv(v)]); R.push([s.xr(v), s.yv(v)]); }
       T.poly(L.map(p => [p[0] - 2, p[1]]).concat(R.slice().reverse().map(p => [p[0] + 2, p[1]])), env.col(mud));
+      // 水面：真ん中ほど深い色、ノイズで流れに沿った色むらをつける（同じ筋のくり返しにしない）
+      const wn = E.fbm2(env.seed + 41, 3), wPal = ['#8ac0e2', '#6ea8d0', '#5a9ac8', '#4a8cc0', '#3a7cb2', '#336fa4'];
       for (let y = s.top; y < H; y++) {
-        const v = (y - s.top) / (H - s.top), a = s.xl(v), b = s.xr(v);
-        const c = env.col(v < 0.35 ? '#6ea8d0' : v < 0.7 ? '#4f92c0' : '#3f82b4', 0.25 * (1 - v));
-        T.R(a, y, b - a, 1, c);
-        if (v > 0.15) for (let x = Math.round(a); x < b; x++) if (bay(x, y) < 0.12 * Math.sin(x * 0.2 + y * 0.6)) T.P(x, y, env.col('#2f6e9e'));
+        const v = (y - s.top) / (H - s.top), a = Math.round(s.xl(v)), b = Math.round(s.xr(v));
+        for (let x = a; x < b; x++) {
+          const u = (x - a) / Math.max(1, b - a), deep = Math.pow(Math.sin(u * Math.PI), 0.7), q = wn(x * 0.09 / (0.3 + v), y * 0.5 / (0.25 + v));
+          const k = clamp(Math.floor((deep * 0.55 + q * 0.6 - 0.05 + v * 0.15) * wPal.length + (bay(x, y) < 0.35 ? 0.4 : 0)), 0, wPal.length - 1);
+          T.P(x, y, env.col(wPal[k], 0.25 * (1 - v)));
+        }
+      }
+      // 白い泡の筋：ところどころに、長さばらばらで少しだけ
+      for (let i = 0; i < W * (H - s.top) / 70; i++) {
+        const v = 0.08 + Math.pow(r(), 0.8) * 0.92, y = Math.round(s.yv(v)), a = s.xl(v), b = s.xr(v), L = 1 + r.int(0, Math.round(1 + v * 5)), x = a + r() * Math.max(1, b - a - L);
+        if (wn(x * 0.2, y * 0.3) > 0.55) T.R(x, y, L, 1, env.col(r() < 0.5 ? '#b8dcf0' : '#2f6e9e', 0.2 * (1 - v)));
       }
       for (const rk of s.rocks) { const v = rk.v, x = lerp(s.xl(v), s.xr(v), rk.u), y = s.yv(v); A.rock(T, env, x, y, rk.w, rk.h, 0, snow); rk.x = x; rk.y = y; }
       // 岸の広葉樹と石
@@ -141,15 +167,11 @@
       A.leafy(T, env, tl, Math.round(hz + (H - hz) * 0.42), Math.round(18 + (H - hz) * 0.18), 0.1, { snow });
       A.leafy(T, env, tr, Math.round(hz + (H - hz) * 0.32), Math.round(15 + (H - hz) * 0.14), 0.15, { snow });
       for (let i = 0; i < 8; i++) { const v = 0.25 + r() * 0.7, left = r() < 0.5; A.rock(T, env, left ? s.xl(v) - 3 - r() * 8 : s.xr(v) + 3 + r() * 8, s.yv(v), 2 + v * 3, 1 + v * 1.5, 0, snow); }
-      // 岸の草むらと花
-      if (!snow) for (let i = 0; i < W * (H - hz) / 90; i++) {
-        const y = hz + 6 + Math.pow(r(), 0.7) * (H - hz - 6), v = (y - s.top) / (H - s.top), x = r() * W;
-        if (x > s.xl(v) - 3 && x < s.xr(v) + 3) continue;
-        if (r() < 0.6) A.tuft(T, x, y, Math.round(2 + v * 3), env.col('#4d7a3a'), env.col('#72a24e'));
-        else T.P(x, y, env.col(r.pick(['#f4f0e0', '#f0d040', '#e88aa8', '#b8a0e8'])));
-      }
       // 水際のぬれた草
       for (let y = s.top; y < H; y++) { const v = (y - s.top) / (H - s.top); T.R(s.xl(v) - 3, y, 1 + v * 2, 1, env.col(snow ? '#c8d2dc' : '#3f6a36')); T.R(s.xr(v) + 2, y, 1 + v * 2, 1, env.col(snow ? '#c8d2dc' : '#3f6a36')); }
+      // 滝の印の色が残ったところ＝見えている滝
+      s.fallMask = null;
+      { const f = s.fall, id = T.g.getImageData(f.x, f.y, f.w, f.h).data, m = []; for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) { const q = (j * f.w + i) * 4; if (id[q] === 255 && id[q + 1] === 0 && id[q + 2] === 254) { m.push([i, j]); T.P(f.x + i, f.y + j, env.col('#bcdcf2', 0.25)); } } s.fallMask = m; }
       // 手前の葦
       if (!snow) {
         for (let x = 0; x < Math.min(W * 0.28, s.xl(0.95) + 10); x += r.int(1, 3)) { const h = r.int(6, 14), c = r() < 0.5 ? '#4f7a34' : '#6a9440'; T.V(x, H - h, h, env.col(c)); if (r() < 0.2) T.R(x, H - h - 3, 1, 3, env.col('#7a4a26')); }
@@ -160,13 +182,17 @@
       const { W, H } = env;
       // 滝の流れ
       const f = s.fall;
-      if (f) for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) { const v = (y * 2 - t * 26 + x * 5) % 7; T.P(f.x + x, f.y + y, env.col(v < 2.5 ? '#f2f8ff' : v < 5 ? '#bcdcf2' : '#8cc0e4', 0.25)); }
-      if (f) for (let k = 0; k < 6; k++) T.P(f.x - 2 + Math.random() * (f.w + 4), f.y + f.h - Math.random() * 2, env.col('#ffffff', 0.2, 0.8));
+      if (f && s.fallMask) {
+        let lowest = -1;
+        for (const [x, y] of s.fallMask) { const v = (((y * 2 - t * 26 + x * 5) % 7) + 7) % 7; T.P(f.x + x, f.y + y, env.col(v < 2.5 ? '#f2f8ff' : v < 5 ? '#bcdcf2' : '#8cc0e4', 0.25)); if (y > lowest) lowest = y; }
+        // しぶきは、滝の下が見えているときだけ
+        if (lowest >= f.h - 2) for (let k = 0; k < 6; k++) { const x = Math.floor(Math.random() * f.w); if (s.fallMask.some(([mx, my]) => mx === x && my >= f.h - 2)) T.P(f.x + x + Math.round((Math.random() - 0.5) * 2), f.y + f.h - 1 - Math.random() * 2, env.col('#ffffff', 0.2, 0.8)); }
+      }
       // 水の流れ（手前ほど速く長い）
       const hi = env.col('#cfe8f8', 0, 0.75), hi2 = env.col('#9ccae8', 0, 0.6);
       for (const p of s.streaks) {
         p.v += dt * (0.035 + p.v * 0.09) * p.sp; if (p.v > 1) { p.v = 0; p.u = Math.random(); }
-        const x = lerp(s.xl(p.v), s.xr(p.v), 0.04 + p.u * 0.92), y = s.yv(p.v), L = 1 + Math.round(p.v * 5);
+        const x = lerp(s.xl(p.v), s.xr(p.v), 0.04 + p.u * 0.92), y = s.yv(p.v), L = 1 + Math.round(p.v * (2 + p.l * 6));
         T.R(x, y, L, 1, p.sp > 0.9 ? hi : hi2);
       }
       for (const rk of s.rocks) if (rk.x !== undefined) for (let k = 0; k < 3; k++) T.P(rk.x - rk.w + Math.random() * rk.w * 2, rk.y - rk.h - 1 + Math.random() * 2, env.col('#ffffff', 0, 0.85));
@@ -203,7 +229,7 @@
     amb: env => [['town', 0.6], ['wind', 0.25], env.night < 0.5 ? ['birds', 0.25] : ['crickets', 0.2]],
     init(env, r) {
       const { W, H } = env, st = H - A.groundDepth(H, 0.27, 22, 66);
-      return { st, wins: [], lamps: [], cat: null, nextCat: 10 + r() * 30, pigeons: [0, 1, 2].map(i => ({ x: r() * W, ph: r() * 6 })) };
+      return { st, wins: [], lamps: [], cat: null, nextCat: 10 + r() * 30, pigeons: [0, 1, 2].map(i => ({ x: W * (0.15 + i * 0.3) + r() * W * 0.12, ph: r() * 6 })) };
     },
     build(T, env, s) {
       const { W, H } = env, st = s.st, r = RNG(env.seed), snow = env.weather === 'snow';
@@ -268,7 +294,11 @@
       // ハト（昼）
       if (env.night < 0.4 && env.weather !== 'rain') for (const p of s.pigeons) {
         p.x += Math.sin(t * 0.3 + p.ph) * dt * 2; const peck = Math.sin(t * 2 + p.ph) > 0.6;
-        T.R(p.x, st + 7, 3, 2, env.col('#7a7e8c')); T.P(p.x + (peck ? 3 : 2), st + (peck ? 8 : 6), env.col('#5a6070')); T.P(p.x + 1, st + 9, env.col('#c86a4a'));
+        // 輪郭つきのハト（右向き。ふっくらした胴・首の緑・黄色い目・赤い足。ついばむときは頭を下げる）
+        const spr = peck
+          ? ['..........', '.ooooo....', 'obbbbbooo.', 'owwbbbggho', '.oooooohhe', '...f.f..ok']
+          : ['......ooo.', '.....ohhho', '.....ohhek', '.ooooogg..', 'obbbbbbgo.', 'owwbbbbbo.', '.oooooooo.', '...f.f....'];
+        T.spr(spr, p.x - 5, st + (peck ? 5 : 3), { o: env.col('#2a2c33'), b: env.col('#b4b8c4'), w: env.col('#8a8f9c'), g: env.col('#6a9a8a'), h: env.col('#7e8494'), e: env.col('#f0c040'), k: env.col('#d8b0a0'), f: env.col('#e0805a') }, Math.sin(p.ph) < 0);
       }
       // 猫がときどき通る
       s.nextCat -= dt;

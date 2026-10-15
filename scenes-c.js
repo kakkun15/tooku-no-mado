@@ -11,8 +11,9 @@
     wind: () => -26,
     init(env, r) {
       const { W, H } = env, hz = H - A.groundDepth(H, 0.44, 40, 116);
-      const layers = []; const n = 4;
-      for (let i = 0; i < n; i++) { const f = i / (n - 1); layers.push({ base: Math.round(lerp(hz + 3, H - (H - hz) * 0.18, f)), amp: lerp(5, 20, f), fr: lerp(0.03, 0.012, f), d: lerp(0.6, 0, f), n: fbm(r() * 1e5 | 0, 3), off: r() * 100 }); }
+      // 砂丘は3列。手前の2列は「砂丘がある所」と「平らな砂地」がまだらになるようにする（起伏だらけにしない）
+      const layers = []; const n = 3;
+      for (let i = 0; i < n; i++) { const f = i / (n - 1); layers.push({ base: Math.round(lerp(hz + 3, H - (H - hz) * 0.3, f)), amp: lerp(6, 18, f), fr: lerp(0.026, 0.011, f), d: lerp(0.6, 0, f), n: fbm(r() * 1e5 | 0, 3), mn: noise1(r() * 1e5 | 0), off: r() * 100, flat: i > 0 }); }
       return { hz, layers, car: { x: -40, next: 5 + r() * 15 }, sand: [] };
     },
     build(T, env, s) {
@@ -20,21 +21,25 @@
       const lit = '#e9bd7c', shade = '#c08654', base = '#dcaa6c';
       for (const L of s.layers) {
         // 風上はゆるく登り、稜線の先で急に落ちる砂丘の形
-        const prof = x => { const u = x * L.fr * 0.85 + L.off + L.n(x * L.fr * 0.6) * 1.4, p = u - Math.floor(u), k = Math.floor(u), amp = L.amp * (0.55 + 0.45 * Math.abs(Math.sin(k * 12.9898) % 1));
-          return [L.base - amp * (p < 0.72 ? Math.pow(p / 0.72, 1.4) : Math.pow(1 - (p - 0.72) / 0.28, 0.7)), p >= 0.72]; };
+        L.mask = x => L.flat ? clamp((L.mn(x * 0.016 + L.off) - 0.45) * 3.4, 0, 1) : 1;   // 0 のところは平ら
+        const prof = x => { const u = x * L.fr * 0.85 + L.off + L.n(x * L.fr * 0.6) * 1.4, p = u - Math.floor(u), k = Math.floor(u), amp = L.amp * (0.55 + 0.45 * Math.abs(Math.sin(k * 12.9898) % 1)) * L.mask(x);
+          return [L.base - (1 - L.mask(x)) * (1 + Math.sin(x * 0.045 + L.off) * 1.2) - amp * (p < 0.72 ? Math.pow(p / 0.72, 1.4) : Math.pow(1 - (p - 0.72) / 0.28, 0.7)), p >= 0.72]; };
         L.crest = x => prof(x)[0];
         for (let x = 0; x < W; x++) {
-          const [yf, slip] = prof(x), y = Math.round(yf), depthBand = Math.round(6 + L.amp * 0.6);
+          const [yf, slip0] = prof(x), y = Math.round(yf), m = L.mask(x), slip = slip0 && m > 0.25, depthBand = Math.round((6 + L.amp * 0.6) * (0.3 + 0.7 * m));
           T.R(x, y, 1, H - y, env.col(base, L.d));
           if (slip) { T.R(x, y, 1, depthBand + 4, env.col(shade, L.d)); for (let j = depthBand + 4; j < depthBand + 9; j++) if (bay(x, y + j) < (depthBand + 9 - j) / 6) T.P(x, y + j, env.col(shade, L.d)); }
           else { T.R(x, y, 1, 3, env.col(lit, L.d)); for (let j = 3; j < depthBand; j++) if (bay(x, y + j) < 1 - j / depthBand) T.P(x, y + j, env.col(lit, L.d)); }
           T.P(x, y, env.col(slip ? '#d49a62' : '#f8dca6', L.d));
         }
-        // 風紋
-        if (L.d < 0.3) for (let i = 0; i < W / 2; i++) { const x = r() * W, y = L.crest(x) + 8 + r() * (H - L.crest(x)); if (y < H) T.H(x, y, r.int(2, 5), env.col('#c8945c', L.d)); }
+        // 風紋（平らなところは細い筋を多めに）
+        if (L.d < 0.35) for (let i = 0; i < W * 0.8; i++) { const x = r() * W, y = L.crest(x) + 4 + r() * (H - L.crest(x)); if (y < H) T.H(x, y, r.int(2, 6), env.col(L.mask(x) < 0.3 ? '#cf9e64' : '#c8945c', L.d)); }
       }
       // オアシス
-      const L2 = s.layers[1], ox = Math.round(W * 0.8), oy = Math.round(L2.crest(ox)) + 7;
+      // オアシスは、2列目のいちばん平らなところに置く
+      const L2 = s.layers[1]; let ox = Math.round(W * 0.7), best = 9;
+      for (let x = Math.round(W * 0.15); x < W * 0.88; x += 2) { const m = L2.mask(x) + L2.mask(x - 12) + L2.mask(x + 12); if (m < best) { best = m; ox = x; } }
+      const oy = Math.round(L2.crest(ox)) + 6;
       T.ellipse(ox, oy, 9, 2, env.col('#5aa0c0', 0.4)); T.H(ox - 6, oy - 1, 5, env.col('#9ad0e8', 0.4));
       A.palm(T, env, ox - 8, oy + 1, 13, 0.4, -1); A.palm(T, env, ox + 7, oy + 1, 11, 0.4, 1); A.palm(T, env, ox + 2, oy, 9, 0.45, 0.4);
       for (let k = -10; k <= 10; k += 3) A.tuft(T, ox + k, oy + 2, 2, env.col('#5a8a3a', 0.4), env.col('#7aa04a', 0.4));
@@ -202,16 +207,20 @@
     amb: env => [['waves', 1], ['wind', 0.3], env.night < 0.5 ? ['gulls', 0.5] : ['crickets', 0]],
     init(env, r) {
       const { W, H } = env, hz = H - A.groundDepth(H, 0.5, 44, 126), beach = Math.round(H - (H - hz) * 0.32);
-      return { hz, beach, gulls: [0, 1, 2].map(() => ({ x: r() * W, y: hz * (0.4 + r() * 0.5), ph: r() * 6, v: 4 + r() * 4 })), boat: { x: r() * W }, waves: Array.from({ length: 14 }, (_, i) => ({ y: i / 14, ph: r() * 6, xs: Array.from({ length: Math.ceil(W / 12) }, () => r() * W) })) };
+      return { hz, beach, gulls: [0, 1, 2].map(() => ({ x: r() * W, y: hz * (0.4 + r() * 0.5), ph: r() * 6, v: 4 + r() * 4 })), boat: { x: r() * W }, waves: Array.from({ length: 16 }, (_, i) => ({ y: i / 16, ph: r() * 6, xs: Array.from({ length: Math.ceil(W / 14) }, () => [r() * W, r() * 1.6 + 0.4, r() < 0.3]) })) };
     },
     build(T, env, s) {
       const { W, H } = env, hz = s.hz, r = RNG(env.seed);
-      // 海
-      for (let y = hz; y < s.beach + 4; y++) { const f = (y - hz) / (s.beach - hz); T.H(0, y, W, env.col(f < 0.25 ? '#5a90b8' : f < 0.6 ? '#3f7ea8' : '#3a8aa8', 0.35 * (1 - f))); }
+      // 海：沖は濃く、岸に近いほど明るい。ノイズで色むらをつけて、横一色の帯に見えないようにする
+      const sn = E.fbm2(env.seed + 21, 3), seaPal = ['#2e6e98', '#3a7ea8', '#4a8cb4', '#5a98bc', '#3f8aa6'];
+      for (let y = hz; y < s.beach + 4; y++) { const f = (y - hz) / (s.beach - hz); for (let x = 0; x < W; x++) { const v = f * 0.55 + sn(x * 0.05, y * 0.4 / (0.3 + f)) * 0.6 - 0.1, i = clamp(Math.floor(v * 4 + (bay(x, y) < 0.3 ? 0.25 : 0)), 0, 3); T.P(x, y, env.col(seaPal[i], 0.35 * (1 - f))); } }
       T.H(0, hz, W, env.col('#8ab4d0', 0.5));
-      // 崖と灯台
+      // 崖：地層の縞をノイズでゆらし、ひびと草の垂れを足す
       const cx0 = Math.round(W * (W > H ? 0.72 : 0.6)), ctop = Math.round(hz - (H - hz) * 0.35), n = fbm(env.seed + 3, 3);
-      for (let x = cx0; x < W; x++) { const f = (x - cx0) / (W - cx0 + 1), y = Math.round(ctop + (1 - Math.min(1, f * 4)) * 14 + n(x * 0.2) * 4); T.R(x, y, 1, H - y, env.col(x < cx0 + 6 ? '#6a625c' : '#7e756c')); for (let yy = y + 3; yy < H; yy += 5) if ((x * 3 + yy) % 7 < 2) T.R(x, yy, 1, 2, env.col('#5a524c')); T.R(x, y - 1, 1, 2, env.col('#5a8a42')); }
+      const cy = x => { const f = (x - cx0) / (W - cx0 + 1); return Math.round(ctop + (1 - Math.min(1, f * 4)) * 14 + n(x * 0.2) * 4); };
+      A.stoneFill(T, env, cx0, W, cy, () => H, { seed: env.seed + 31, sx: 0.08, sy: 0.3, pal: ['#4e4842', '#5e5650', '#6e665e', '#7e756c', '#8e857a'], crack: '#3e3834', speck: '#a49a8e',
+        light: (x, y) => (x < cx0 + 6 ? -0.18 : 0) + (y - cy(x)) * -0.003 });
+      for (let x = cx0; x < W; x++) { const y = cy(x); T.R(x, y - 1, 1, 2, env.col('#5a8a42')); if (n(x * 0.9) > 0.62) T.R(x, y + 1, 1, Math.round(n(x * 1.7) * 6), env.col('#4a7a3a')); }
       const lx = Math.round(cx0 + Math.min(18, (W - cx0) * 0.45)), ly = Math.round(ctop + n(lx * 0.2) * 4);
       T.poly([[lx - 4, ly], [lx - 3, ly - 22], [lx + 3, ly - 22], [lx + 4, ly]], env.col('#f0ece4'));
       for (const yy of [ly - 6, ly - 15]) T.R(lx - 4, yy, 9, 3, env.col('#c84040'));
@@ -220,19 +229,29 @@
       s.lamp = { x: lx, y: ly - 25 }; s.cliffX = cx0;
       // 砂浜
       T.R(0, s.beach, W, H - s.beach, env.col('#e4d0a0')); T.dith(0, s.beach, W, H - s.beach, env.col('#e4d0a0'), env.col('#d6c08e'), (i, j) => 0.15 + 0.15 * Math.sin(i * 0.3 + j));
-      for (let i = 0; i < W / 6; i++) T.P(r() * W, s.beach + 4 + r() * (H - s.beach), env.col(r.pick(['#f8f0e0', '#b8a07a', '#e8b0a0'])));
-      // 岩
-      A.rock(T, env, cx0 - 4, s.beach - 2, 5, 3, 0.1); A.rock(T, env, cx0 - 12, s.beach, 3, 2, 0.05);
+      // 砂浜のつぶつぶと、貝殻・小石・ヒトデ・海藻（浜辺らしさ）
+      for (let i = 0; i < W / 4; i++) T.P(r() * W, s.beach + 4 + r() * (H - s.beach), env.col(r.pick(['#f8f0e0', '#b8a07a', '#cdb88a', '#e8dcc0'])));
+      const shells = [
+        [['.ww.', 'wpwp', '.ww.'], { w: '#f6eee4', p: '#e8b0a0' }],            // ほたて
+        [['.oo', 'ooc', '.o.'], { o: '#f2e2c8', c: '#c89a70' }],                // 巻き貝
+        [['.s.', 'sss', 's.s'], { s: '#e8865a' }],                              // ヒトデ
+        [['ww', 'pw'], { w: '#fbf6ee', p: '#d8c8b8' }],                         // 二枚貝
+        [['gg.', '.gg'], { g: '#4a7a4a' }]                                       // 海藻
+      ];
+      for (let i = 0; i < Math.max(5, W / 22); i++) { const [rows, map] = r.pick(shells), m = {}; for (const k in map) m[k] = env.col(map[k]); const x = r.int(2, (s.cliffX || W) - 6), y = r.int(s.beach + 6, H - 4); T.spr(rows, x, y, m, r() < 0.5); }
+      for (let i = 0; i < W / 14; i++) { const x = r.int(0, W), y = r.int(s.beach + 5, H - 2); T.R(x, y, 2, 1, env.col('#9a9088')); T.P(x, y - 1, env.col('#c8beb4')); }
+      // 崖のふもとの岩（砂浜との境目をぼかす）
+      for (let x = s.cliffX - 2; x < W; x += r.int(4, 9)) A.rock(T, env, x, s.beach + r.int(0, 2), r.int(3, 6), r.int(2, 3), 0.05);
       // 流木
       T.R(Math.round(W * 0.2), H - 6, 12, 2, env.col('#9a8064')); T.P(Math.round(W * 0.2) + 11, H - 7, env.col('#9a8064'));
     },
     front(T, env, s, t, dt) {
       const { W, H } = env, hz = s.hz, B = s.beach;
       // 沖の波
-      for (const w of s.waves) { w.y += dt * 0.025; if (w.y > 1) { w.y = 0; w.xs = w.xs.map(() => Math.random() * W); } const y = Math.round(hz + 2 + Math.pow(w.y, 1.3) * (B - hz - 3)), L = 1 + Math.round(w.y * 7), a = Math.sin(w.y * Math.PI); for (const x0 of w.xs) { const x = (x0 + Math.sin(t * 0.3 + w.ph) * 3); if (x < s.cliffX - L) T.H(x, y, L, env.col('#c4e0f0', 0.3 * (1 - w.y), (0.25 + 0.6 * a).toFixed(2))); } }
+      for (const w of s.waves) { w.y += dt * 0.025; if (w.y > 1) { w.y = 0; w.xs = w.xs.map(() => [Math.random() * W, Math.random() * 1.6 + 0.4, Math.random() < 0.3]); } const y = Math.round(hz + 2 + Math.pow(w.y, 1.3) * (B - hz - 3)), a = Math.sin(w.y * Math.PI); for (const [x0, lm, dark] of w.xs) { const L = 1 + Math.round(w.y * 7 * lm), x = (x0 + Math.sin(t * 0.3 + w.ph) * 3); if (x < s.cliffX - L) T.H(x, y + (dark ? 1 : 0), L, env.col(dark ? '#2a6a94' : '#c4e0f0', 0.3 * (1 - w.y), ((dark ? 0.4 : 0.25) + 0.6 * a * (dark ? 0.5 : 1)).toFixed(2))); } }
       // 太陽・月のきらめき
       const sx = env.skyState.moon ? env.skyState.moon.x : (env.hour > 5.5 && env.hour < 19 && env.weather === 'clear' ? W * (0.08 + 0.84 * (env.hour - 5.6) / 13) : null);
-      if (sx !== null && env.weather !== 'fog') for (let k = 0; k < 20; k++) { const y = hz + 1 + Math.pow(Math.random(), 1.5) * (B - hz), sp = 1 + (y - hz) * 0.12; T.H(sx + (Math.random() - 0.5) * sp * 6, y, 1 + Math.round(Math.random() * sp), env.skyState.moon ? 'rgba(220,230,255,0.6)' : env.emi('#fff4d0', 0.7)); }
+      if (sx !== null && env.weather !== 'fog') for (let k = 0; k < 20; k++) { const y = hz + 1 + Math.pow(Math.random(), 1.5) * (B - hz), sp = 1 + (y - hz) * 0.12, gx = sx + (Math.random() - 0.5) * sp * 6, gl = 1 + Math.round(Math.random() * sp); if (gx + gl >= s.cliffX) continue; T.H(gx, y, gl, env.skyState.moon ? 'rgba(220,230,255,0.6)' : env.emi('#fff4d0', 0.7)); }
       // 打ち寄せる波
       const edge = B + 2 + Math.sin(t * 0.45) * 3;
       for (let x = 0; x < s.cliffX + 2; x++) { const y = Math.round(edge + Math.sin(x * 0.15 + t * 0.6) * 1.2); T.R(x, B - 1, 1, y - B + 1, env.col('#4a96b0')); if (bay(x, y) < 0.8) T.P(x, y, env.col('#ffffff')); if (bay(x, y + 1) < 0.4) T.P(x, y + 1, env.col('#e8f4f8')); T.P(x, y + 2, env.col('#c8b888')); }

@@ -15,29 +15,36 @@
     },
     build(T, env, s) {
       const { W, H } = env, sea = s.sea, r = RNG(env.seed), snow = env.weather === 'snow';
-      // 雲海から突き出る遠い峰々
-      const peaks = []; for (let x = r.int(-10, 10); x < W + 20; x += r.int(18, 34)) peaks.push({ x, h: r.int(10, Math.min(46, sea * 0.55)), s: r.range(0.8, 1.4), d: r.range(0.45, 0.8) });
-      peaks.sort((a, b) => b.d - a.d);
-      for (const p of peaks) {
-        const top = sea - p.h, w = p.h / p.s;
-        for (let x = Math.round(p.x - w); x <= p.x + w; x++) {
-          const y = top + Math.abs(x - p.x) * p.s + s.n2(x * 0.3) * 2, lit = x < p.x;
-          T.R(x, y, 1, sea + 6 - y, env.col(lit ? '#8a9ab4' : '#66789a', p.d));
-          const snowH = p.h * 0.45; if (y < top + snowH) T.R(x, y, 1, Math.max(1, top + snowH - y + s.n1(x * 0.4) * 3), env.col(lit ? '#f4f7fb' : '#c4d0e2', p.d));
+      // 雲海から突き出る遠い峰々：奥・手前の2列。高さは低い峰から抜きん出た峰までばらばらにし、
+      // 稜線はノイズでぎざぎざに、日の当たる側と陰の側で色を分ける
+      const peaks = [];
+      for (const [d, hmin, hmax, step] of [[0.82, 0.28, 0.8, [26, 46]], [0.55, 0.1, 0.5, [18, 34]]]) {
+        let prev = 0;
+        for (let x = r.int(-14, 6); x < W + 20; x += r.int(step[0], step[1])) {
+          let f = r.range(hmin, hmax); if (Math.abs(f - prev) < 0.15) f = clamp(f + (f > (hmin + hmax) / 2 ? -0.22 : 0.22), hmin, hmax); prev = f;
+          peaks.push({ x: x + r.int(-4, 4), h: Math.round(Math.min(sea * 0.8, 62) * f), s: r.range(0.75, 1.5), s2: r.range(0.75, 1.5), d, seed: r.int(1, 1e5) });
         }
       }
-      // 手前の岩の頂
+      peaks.sort((a, b) => b.d - a.d || a.h - b.h);
+      for (const p of peaks) {
+        const top = sea - p.h, jag = noise1(p.seed), jag2 = noise1(p.seed + 3), wl = p.h / p.s, wr = p.h / p.s2;
+        for (let x = Math.round(p.x - wl); x <= p.x + wr; x++) {
+          const dx = x - p.x, lit = dx < 0, y = top + Math.abs(dx) * (lit ? p.s : p.s2) + (jag(x * 0.35) - 0.5) * 4 * Math.min(1, Math.abs(dx) / 4);
+          T.R(x, y, 1, sea + 6 - y, env.col(lit ? '#8a9ab4' : '#66789a', p.d));
+          // 尾根から落ちる谷筋（陰の線）
+          if (!lit && jag2(x * 0.5) > 0.8 && Math.abs(dx) > 3) T.R(x, y + 3, 1, Math.max(0, sea - y - 3) * 0.35, env.col('#5e6e90', p.d));
+          const snowH = p.h * (0.3 + 0.25 * jag2(p.x)) + (jag(x * 0.6) - 0.5) * 5;
+          if (y < top + snowH) T.R(x, y, 1, Math.max(1, top + snowH - y), env.col(lit ? '#f4f7fb' : '#c4d0e2', p.d));
+        }
+      }
+      // 手前の岩の頂：ノイズで岩肌を塗り分け、ひびと小石を散らす（縞のくり返しにしない）
       const px = Math.round(W * (W > H ? 0.36 : 0.45)), py = Math.round(H - (H - sea) * 0.78);
       const prof = x => { const d = (x - px) / W; return py + Math.abs(d) * (H - py) * (d < 0 ? 1.7 : 1.15) + s.n1(x * 0.12) * 5 - 2; };
-      for (let x = 0; x < W; x++) {
-        const y = Math.round(prof(x));
-        for (let yy = y; yy < H; yy += 2) { const lit = x < px + (s.n2(yy * 0.15 + 3) - 0.5) * 18 + (yy - y) * 0.25; T.R(x, yy, 1, 2, env.col(lit ? '#7c736c' : '#5d5650')); }
-        const lit = x < px;
-        for (let k = 0; k < 3; k++) { const yy = y + 2 + ((s.n2(x * 0.7 + k * 9) * (H - y)) | 0); if ((x + k * 3) % 7 === 0) T.R(x, yy, 1, 2, env.col('#4a4440')); }
-        T.P(x, y, env.col(lit ? '#9a918a' : '#6e6660'));
-        if (snow || s.n2(x * 0.3) > 0.7) T.R(x, y, 1, snow ? 2 : 1, env.col('#eef2f8'));
-      }
-      for (let i = 0; i < W / 3; i++) { const x = r() * W, y = prof(x) + r() * (H - prof(x)); T.R(x, y, r.int(2, 4), 1, env.col('#a59c94')); }
+      A.stoneFill(T, env, 0, W, prof, () => H, { seed: env.seed + 11, sx: 0.09, sy: 0.16, pal: ['#4e4843', '#5d5650', '#6e6660', '#7c736c', '#8e857d'], crack: '#3e3935', speck: '#a59c94',
+        light: (x, y) => { const ridge = px + (y - prof(px)) * 0.18; return (x < ridge ? 0.16 : -0.14) - (y - prof(x)) * 0.004; } });
+      for (let x = 0; x < W; x++) { const y = Math.round(prof(x)); T.P(x, y, env.col(x < px ? '#9a918a' : '#6e6660')); if (snow || s.n2(x * 0.3) > 0.7) T.R(x, y, 1, snow ? 2 : 1, env.col('#eef2f8')); }
+      // 小石：明るい面と影の2色の小さなかけら
+      for (let i = 0; i < W / 4; i++) { const x = Math.round(r() * W), y = Math.round(prof(x) + 3 + r() * (H - prof(x))), w = r.int(2, 4); T.R(x, y, w, 1, env.col('#a59c94')); T.R(x + 1, y + 1, w, 1, env.col('#3e3935')); if (snow && r() < 0.5) T.R(x, y - 1, w, 1, env.col('#eef2f8')); }
       // 高山の草
       if (!snow) for (let i = 0; i < W / 4; i++) { const x = r() * W, y = prof(x) + 1 + r() * 6; A.tuft(T, x, y, r.int(1, 3), env.col('#6a7a44'), env.col('#8a9a54')); }
       // ケルン（石積み）と古い道標
@@ -85,11 +92,22 @@
     },
     skyExtra(T, env, s, t) {
       const { W, H } = env;
-      // 大きな輪のある星
-      const R = Math.round(Math.min(W, H) * 0.16), px = Math.round(W * 0.22), py = Math.round(H * 0.18), d = 0.55;
-      T.circ(px, py, R, env.col('#b8a8d8', d)); for (let y = -R; y <= R; y += 3) T.H(px - Math.sqrt(Math.max(0, R * R - y * y)) | 0, py + y, (Math.sqrt(Math.max(0, R * R - y * y)) * 2) | 0, env.col('#a898c8', d));
-      T.circ(px + R * 0.3, py - R * 0.3, Math.round(R * 0.5), env.col('#c8bae4', d));
-      for (let a = 0; a < 6.283; a += 0.01) { const x = px + Math.cos(a) * R * 1.7, y = py + Math.sin(a) * R * 0.35 - Math.cos(a) * R * 0.15; if (Math.sin(a) > 0 || Math.hypot(x - px, y - py) > R) T.P(x, y, env.col('#e0d4f0', d)); }
+      // 大きな輪のある星：球の陰影（左上が明るい）、ゆるい縞、輪は奥半分を星の後ろ・手前半分を前に
+      const R = Math.round(Math.min(W, H) * 0.15), px = Math.round(W * 0.22), py = Math.round(H * 0.19), d = 0.55;
+      const ring = (front) => { for (let a = 0; a < 6.283; a += 0.004) { const sa = Math.sin(a); if ((sa > 0) !== front) continue; for (const [k, c] of [[1.55, '#d8cce8'], [1.7, '#e8def4'], [1.85, '#c8bcdc']]) { const x = Math.round(px + Math.cos(a) * R * k), y = Math.round(py + sa * R * k * 0.24 - Math.cos(a) * R * 0.12); T.P(x, y, env.col(c, d)); } } };
+      ring(false);
+      const bandN = E.noise1(7);
+      for (let y = -R; y <= R; y++) {
+        const hw = Math.floor(Math.sqrt(Math.max(0, R * R - y * y)) + 0.35);
+        for (let x = -hw; x <= hw; x++) {
+          const lx = (x + R * 0.45) / R, ly = (y + R * 0.45) / R, l = 1 - Math.sqrt(lx * lx + ly * ly) * 0.62; // 光の当たり方
+          const band = bandN(y * 0.35 + 3) > 0.62 ? -0.12 : bandN(y * 0.35 + 3) < 0.3 ? 0.06 : 0;
+          const v = l + band, c = v > 0.72 ? '#d8cce8' : v > 0.52 ? '#c2b2dc' : v > 0.3 ? '#a898c8' : '#8a7aac';
+          const dither = (v > 0.7 && v < 0.74) || (v > 0.5 && v < 0.54) || (v > 0.28 && v < 0.32);
+          T.P(px + x, py + y, env.col(dither && bay(x + px, y + py) < 0.5 ? '#b4a4d2' : c, d));
+        }
+      }
+      ring(true);
       // オーロラ（晴れた夜）
       if (env.night > 0.5 && env.weather === 'clear') {
         const g = T.g; g.save(); g.globalCompositeOperation = 'lighter';
@@ -104,9 +122,12 @@
       for (const I of s.isl) {
         const w = I.w, h = Math.round(w * 0.85), cv = document.createElement('canvas'); cv.width = w * 2 + 8; cv.height = h + 60;
         const g = cv.getContext('2d'), t2 = E.tools(g), ox = w + 4, oy = 40, n = fbm(r() * 1e5 | 0, 3), d = I.d;
-        // 岩の胴
-        for (let x = -w; x <= w; x++) { const f = Math.abs(x) / w, depth = h * (1 - f * f * 0.9) * (0.75 + n(x * 0.15) * 0.45); t2.R(ox + x, oy, 1, depth, env.col(x < 0 ? '#8a7a6a' : '#6e5f52', d)); for (let y = 3; y < depth; y += 4 + ((x * 7) % 3)) t2.P(ox + x, oy + y, env.col('#5a4d42', d)); }
-        for (let x = -w; x <= w; x++) { const y = oy + 2 + n(x * 0.4 + 5) * 3; t2.R(ox + x, y, 1, 2, env.col('#a39282', d)); }
+        // 岩の胴：下へ細くなる不規則な形。地層の縞はノイズでゆらし、ひびと小石を散らす
+        const bottom = x => { const f = Math.abs(x) / w; return oy + h * (1 - f * f * 0.9) * (0.7 + n(x * 0.15) * 0.5); };
+        A.stoneFill(t2, env, ox - w, ox + w + 1, x => oy, x => bottom(x - ox), { seed: r.int(1, 1e5), depth: d, sx: 0.07, sy: 0.32, pal: ['#4e4239', '#5e5046', '#6e5f52', '#7e6d5e', '#8e7d6c'], crack: '#3e342c', speck: '#a39282',
+          light: (x, y) => (x < ox ? 0.12 : -0.1) - (y - oy) / h * 0.25 });
+        // 下の縁は少し暗く（影）
+        for (let x = -w; x <= w; x++) { const yb = Math.round(bottom(x)); t2.R(ox + x, yb - 2, 1, 2, env.col('#3e342c', d)); }
         // 垂れ下がるつる
         for (let k = 0; k < w / 3; k++) { const x = ox + r.int(-w + 2, w - 2), L = r.int(3, 12); t2.R(x, oy + 2, 1, L, env.col('#3f7a3e', d)); }
         // 草の上面
@@ -186,7 +207,7 @@
     amb: env => [['town', 0.35], env.night < 0.5 ? ['birds', 0.35] : ['crickets', 0.6], ['wind', 0.15]],
     init(env, r) {
       const { W, H } = env, road = H - A.groundDepth(H, 0.22, 18, 54);
-      return { road, rail: Math.round(env.H * 0.58) - 2, train: { x: 0, on: false, next: 12 + r() * 20, dir: 1 }, bike: { on: false, next: 20 + r() * 30 }, cat: { sleep: true }, cross: null };
+      return { road, rail: Math.min(Math.round(env.H * 0.58) - 2, road - 35), train: { x: 0, on: false, next: 12 + r() * 20, dir: 1 }, bike: { on: false, next: 20 + r() * 30 }, cat: { sleep: true }, cross: null };
     },
     build(T, env, s) {
       const { W, H } = env, road = s.road, rail = s.rail, r = RNG(env.seed), snow = env.weather === 'snow';
@@ -200,6 +221,9 @@
       T.R(0, rail, W, 4, env.col('#7a7a6c', 0.25)); T.H(0, rail, W, env.col('#9a9888', 0.25)); T.H(0, rail - 1, W, env.col('#5a5a5a', 0.25));
       for (let x = r.int(0, 20); x < W; x += 34) { T.V(x, rail - 16, 16, env.col('#6a6a66', 0.25)); T.H(x - 3, rail - 15, 7, env.col('#6a6a66', 0.25)); }
       T.H(0, rail - 14, W, env.col('#4a4a4a', 0.25));
+      // ここから手前（家・塀・道）は別の絵に描く。電車をその間にはさむため
+      const nc = document.createElement('canvas'); nc.width = W; nc.height = H; const ng = nc.getContext('2d'); ng.imageSmoothingEnabled = false;
+      s.near = nc; T = E.tools(ng);
       // 家々
       s.wins = []; const hb = road - 8;
       let x = -r.int(0, 10);
@@ -209,12 +233,17 @@
         T.R(x, top, w, h + 8, env.col(wall)); T.R(x + w - 2, top, 2, h + 8, env.col('#b8b2a4'));
         T.poly([[x - 2, top + 1], [x + 3, top - 7], [x + w - 3, top - 7], [x + w + 2, top + 1]], env.col(roof)); T.H(x - 2, top + 1, w + 4, env.col('#2e3440'));
         for (let k = 0; k < 4; k++) T.H(x + 1 + k, top - 5 + k * 2, w - 2 - k * 2, env.col('#ffffff', 0, 0.06));
-        // 窓（アルミ枠）
-        for (let k = 0; k < 2; k++) { const wx = x + 4 + k * Math.round((w - 12) / 1), wy = top + 4; if (wx + 6 > x + w) break; T.R(wx, wy, 6, 5, env.col('#b8c0c8')); T.R(wx + 1, wy + 1, 2, 3, env.col('#8ab0d0')); T.R(wx + 3, wy + 1, 2, 3, env.col('#7aa0c0')); s.wins.push(A.makeWindow(wx + 1, wy + 1, 4, 3, r)); }
+        // 窓（アルミ枠）。左右対称に2つ並べると顔に見えるので、家ごとに大きさ・高さ・数を変える
+        const win = (wx, wy, ww, wh) => { if (wx < x + 1 || wx + ww > x + w - 2) return; T.R(wx, wy, ww, wh, env.col('#b8c0c8')); const half = Math.max(1, (ww - 2) >> 1); T.R(wx + 1, wy + 1, half, wh - 2, env.col('#8ab0d0')); T.R(wx + 1 + half, wy + 1, ww - 2 - half, wh - 2, env.col('#7aa0c0')); if (r() < 0.5) T.R(wx + 1, wy + 1, ww - 2, 1, env.col('#d8d0c0')); s.wins.push(A.makeWindow(wx + 1, wy + 1, ww - 2, wh - 2, r)); };
+        const lay = r.int(0, 3);
+        if (lay === 0) { win(x + 3, top + 3, 10, 4); win(x + w - 9, top + 9, 4, 5); }                        // 横長の窓と、低い小窓
+        else if (lay === 1) { win(x + 4, top + 5, 6, 5); T.R(x + w - 10, top + 10, 5, h - 2, env.col('#8a7058')); T.V(x + w - 6, top + 14, 2, env.col('#d8c090')); } // 窓と玄関
+        else if (lay === 2) { win(x + w - 13, top + 3, 8, 5); win(x + 3, top + 12, 3, 3); }                   // 片寄せの窓と、すりガラスの小窓
+        else { win(x + 3, top + 4, 5, 6); win(x + 10, top + 4, 5, 6); win(x + 17, top + 4, 5, 6); T.H(x + 2, top + 10, Math.min(w - 4, 21), env.col('#9a9a96')); } // 3つ並びとベランダの手すり
         // ベランダの洗濯物
         if (r() < 0.4) { const bx = x + 3; T.H(bx, top + 11, w - 6, env.col('#8a8a8a')); s.laundry = s.laundry || []; for (let k = 0; k < 3; k++) s.laundry.push({ x: bx + 2 + k * 5, y: top + 12, c: r.pick(['#ffffff', '#e8a0a0', '#a0c0e8', '#f0e090']) }); }
         // エアコンの室外機
-        if (r() < 0.5) { T.R(x + w - 9, top + h - 2, 5, 4, env.col('#d8d8d0')); T.circ(x + w - 7, top + h, 1, env.col('#9a9a94')); }
+        if (lay !== 1 && r() < 0.5) { const ax = r() < 0.5 ? x + 2 : x + w - 9; T.R(ax, top + h - 1, 6, 4, env.col('#d8d8d0')); T.H(ax, top + h - 1, 6, env.col('#e8e8e2')); for (let k = 0; k < 3; k++) T.V(ax + 1 + k, top + h, 2, env.col('#a8a8a2')); }
         x += w + r.int(2, 6);
       }
       // 庭木
@@ -254,42 +283,70 @@
       T.R(cx - 3, rail - 9, 2, 2, env.col('#5a1a1a')); T.R(cx + 2, rail - 9, 2, 2, env.col('#5a1a1a'));
       s.cross = { x: cx, y: rail - 8 };
       s.catAt = { x: Math.round(W * 0.2), y: hb - 3 };
+      if (snow) A.snowEdges(ng, env);
     },
-    back(T, env, s, t, dt) {
+    front(T, env, s, t, dt) {
       const { W } = env, tr = s.train;
       tr.next -= dt;
-      if (!tr.on && tr.next < 0) { tr.on = true; tr.dir = Math.random() < 0.5 ? 1 : -1; tr.cars = 4 + (Math.random() * 3 | 0); tr.x = tr.dir > 0 ? -tr.cars * 30 - 10 : W + 10; tr.c = ['#2f9a5a', '#e07830', '#3a6ad0', '#c8a020'][Math.random() * 4 | 0]; if (window.TookuPlayer) window.TookuPlayer.ambEvent('crossing'); }
+      if (!tr.on && tr.next < 0) { tr.on = true; tr.dir = Math.random() < 0.5 ? 1 : -1; tr.cars = 4 + (Math.random() * 3 | 0); tr.x = tr.dir > 0 ? -tr.cars * 30 - 10 : W + 10; tr.k = TRAINS[Math.random() * TRAINS.length | 0]; if (tr.k === s.lastTrain) tr.k = TRAINS[(TRAINS.indexOf(tr.k) + 1) % TRAINS.length]; s.lastTrain = tr.k; if (window.TookuPlayer) window.TookuPlayer.ambEvent('crossing'); }
       s.crossOn = false;
       if (tr.on) {
-        tr.x += tr.dir * 34 * dt; const y = s.rail - 11;
+        tr.x += tr.dir * 34 * dt; const y = s.rail - 12, K = tr.k, d = 0.04, c = h => env.col(h, d);
         for (let k = 0; k < tr.cars; k++) {
-          const x = Math.round(tr.x + k * 30);
+          const x = Math.round(tr.x + k * 30), lead = tr.dir > 0 ? k === tr.cars - 1 : k === 0, tail = tr.dir > 0 ? k === 0 : k === tr.cars - 1;
           if (x > W + 2 || x < -32) continue;
-          T.R(x, y, 28, 10, env.col('#d8dce0', 0.25)); T.H(x, y + 6, 28, env.col(tr.c, 0.25)); T.H(x, y, 28, env.col('#a8acb0', 0.25));
-          for (let w = 2; w < 26; w += 4) T.R(x + w, y + 2, 3, 3, env.col('#4a5868', 0.25));
-          T.line(x + 10, y - 1, x + 14, y - 4, env.col('#3a3a3a', 0.25)); T.line(x + 14, y - 4, x + 18, y - 1, env.col('#3a3a3a', 0.25));
+          // 車体：屋根の縁→屋根→側面（窓の帯・色の帯）→すそ→台車。輪郭を濃い色でとって、空や家と混ざらないように
+          T.R(x, y, 28, 10, c(K.body));
+          T.H(x + 1, y, 26, c(K.edge || '#3c4046')); T.H(x, y + 1, 28, c(K.roof)); T.P(x, y + 1, c(K.edge || '#3c4046')); T.P(x + 27, y + 1, c(K.edge || '#3c4046'));
+          if (K.top) T.H(x, y + 2, 28, c(K.top));
+          if (K.band2) T.H(x, y + 6, 28, c(K.band2));
+          if (K.band) T.R(x, y + 7, 28, K.bandH || 1, c(K.band));
+          T.H(x, y + 9, 28, c(K.shade || '#4a4e56'));
+          T.V(x, y + 2, 7, c(K.shade || '#4a4e56')); T.V(x + 27, y + 2, 7, c(K.shade || '#4a4e56'));
+          for (let w = 2; w < 26; w += 4) { if (w === 6 || w === 18) continue; T.R(x + w, y + 3, 3, 3, c(K.win)); T.P(x + w, y + 3, c('#9ab0c4')); }
+          for (const dx of [6, 18]) { T.R(x + dx, y + 3, 3, 6, c(K.door || K.shade || '#4a4e56')); T.R(x + dx, y + 3, 3, 2, c(K.win)); }
+          T.H(x + 1, y + 10, 26, c('#26272b')); T.R(x + 3, y + 11, 6, 1, c('#1e1e22')); T.R(x + 19, y + 11, 6, 1, c('#1e1e22'));
+          if (!(tr.dir > 0 ? k === tr.cars - 1 : k === 0)) T.R(tr.dir > 0 ? x + 28 : x - 2, y + 4, 2, 5, c('#2a2a2e'));
+          // 先頭の顔（運転台の窓・行き先・ライト）
+          if (lead) { const fx = tr.dir > 0 ? x + 24 : x + 1; T.R(fx, y + 3, 3, 3, c('#1e2a36')); T.P(fx + (tr.dir > 0 ? 2 : 0), y + 2, c('#f0e8a0')); T.P(tr.dir > 0 ? x + 27 : x, y + 8, c('#fff4c0')); }
+          if (tail) T.P(tr.dir > 0 ? x : x + 27, y + 8, c('#e04030'));
+          if (k % 2 === 1) { T.line(x + 10, y - 1, x + 14, y - 4, c('#3a3a3a')); T.line(x + 14, y - 4, x + 18, y - 1, c('#3a3a3a')); T.H(x + 12, y - 4, 5, c('#3a3a3a')); }
         }
-        s.trainWin = { x: tr.x, cars: tr.cars, y: y + 2 };
+        s.trainWin = { x: tr.x, cars: tr.cars, y: y + 3 };
         s.crossOn = true;
         if (tr.x > W + 20 || tr.x < -tr.cars * 30 - 20) { tr.on = false; tr.next = 70 + Math.random() * 90; s.trainWin = null; }
       }
-    },
-    front(T, env, s, t, dt) {
-      const { W } = env;
+      if (s.near) T.g.drawImage(s.near, 0, 0);
       // 洗濯物（昼だけ、雨と夜は取り込む）
       if (s.laundry && env.night < 0.4 && env.weather !== 'rain') for (const l of s.laundry) { const sw = Math.round(Math.sin(t * 2 + l.x) * 0.6); T.R(l.x + sw, l.y, 3, 4, env.col(l.c)); }
       // 塀の上の猫
       const ca = s.catAt;
-      if (env.weather !== 'rain') { const sleep = Math.floor(t / 30) % 3 !== 2; T.spr(sleep ? ['.k.k.', 'kkkkk', 'kkkkkk'] : ['k.k..', 'kek..', 'kkkk.', 'kkkkk'], ca.x, ca.y - (sleep ? 3 : 4), { k: env.col('#e8e4dc'), e: env.col('#3a3a3a') }); if (sleep) T.P(ca.x + 5, ca.y - 1, env.col('#d8a050')); }
-      // 自転車が通る
+      if (env.weather !== 'rain') { const sleep = Math.floor(t / 30) % 3 !== 2; T.spr(sleep ? ['.k.k...', 'kkkkk..', 'kskkkkt', '.kkkkk.'] : ['k.k....', 'kkk....', 'kkkk...', '.kkkk..', '.kkkkkt'], ca.x, ca.y - (sleep ? 4 : 5), { k: env.col('#d89048'), s: env.col('#b06a30'), t: env.col('#b06a30') }); }
+    },
+    // 自転車はいちばん手前（電柱・自販機のあかりより前）に描く
+    over(T, env, s, t, dt) {
+      const { W } = env;
       const b = s.bike; b.next -= dt;
-      if (!b.on && b.next < 0 && env.night < 0.7) { b.on = true; b.dir = Math.random() < 0.5 ? 1 : -1; b.x = b.dir > 0 ? -10 : W + 10; b.c = ['#3a6ad0', '#d84a4a', '#3a3a3a'][Math.random() * 3 | 0]; }
+      if (!b.on && b.next < 0 && env.night < 0.7) { b.on = true; b.dir = Math.random() < 0.5 ? 1 : -1; b.x = b.dir > 0 ? -14 : W + 14; b.c = ['#3a6ad0', '#d84a4a', '#e8e4dc', '#3a8a5a', '#e0a030'][Math.random() * 5 | 0]; b.shirt = ['#e8e4d8', '#5a8ac8', '#d87a5a', '#6a9a5a', '#e0c060', '#8a6ab0'][Math.random() * 6 | 0]; b.hair = ['#2a2a2a', '#4a3020', '#6a4a30'][Math.random() * 3 | 0]; b.basket = Math.random() < 0.6; b.cap = Math.random() < 0.3; }
       if (b.on) {
-        b.x += b.dir * 14 * dt; const x = Math.round(b.x), y = s.road + 6, sp = Math.floor(t * 8) % 2;
-        T.circ(x - 3, y, 2, env.col('#2a2a2a')); T.circ(x + 3, y, 2, env.col('#2a2a2a')); T.P(x - 3, y, env.col(sp ? '#aaa' : '#2a2a2a')); T.P(x + 3, y, env.col(sp ? '#2a2a2a' : '#aaa'));
-        T.line(x - 3, y, x, y - 3, env.col('#9aa0a8')); T.line(x, y - 3, x + 3, y, env.col('#9aa0a8'));
-        T.spr(['.h.', '.f.', 'cc.', 'cc.', '.l.'], x - 1, y - 9, { h: env.col('#2a2a2a'), f: env.col('#f0c8a0'), c: env.col(b.c), l: env.col('#3a3f58') }, b.dir < 0);
-        if (b.x < -14 || b.x > W + 14) { b.on = false; b.next = 50 + Math.random() * 60; }
+        b.x += b.dir * 14 * dt;
+        const X = Math.round(b.x), Y = s.road + 7, D = b.dir, P = (dx, dy, c) => T.P(X + D * dx, Y + dy, c), R = (dx, dy, w, h, c) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) P(dx + i, dy + j, c); }, L = (x0, y0, x1, y1, c) => T.line(X + D * x0, Y + y0, X + D * x1, Y + y1, c);
+        const tire = env.col('#34353a'), spoke = env.col('#7a7a80'), fr = env.col(b.c), sk = env.col('#f0c8a0'), skd = env.col('#d8a880'), hair = env.col(b.hair), pants = env.col('#3a3f58'), sh = env.col(b.shirt), ph = Math.floor(t * 6) % 2;
+        // 車輪：細い輪と、回るスポーク（輪は淡い色にして目立たせすぎない）
+        for (const cx of [-5, 5]) { for (const [dx, dy] of [[-1, -2], [0, -2], [1, -2], [2, -1], [2, 0], [2, 1], [1, 2], [0, 2], [-1, 2], [-2, 1], [-2, 0], [-2, -1]]) P(cx + dx, dy, tire); if (ph) { P(cx, -1, spoke); P(cx, 1, spoke); } else { P(cx - 1, 0, spoke); P(cx + 1, 0, spoke); } P(cx, 0, spoke); }
+        // フレーム・サドル・ハンドル・かご
+        L(-5, 0, -1, -4, fr); L(-1, -4, 3, -4, fr); L(3, -4, 5, 0, fr); L(-1, -4, 0, 0, fr); L(0, 0, -5, 0, fr);
+        R(-3, -5, 3, 1, env.col('#2a2a2a')); L(3, -4, 3, -6, env.col('#5a5a5e')); R(2, -7, 3, 1, env.col('#2a2a2a'));
+        if (b.basket) { R(4, -6, 3, 3, env.col('#b8b8b0')); P(5, -5, env.col('#8a8a84')); }
+        // 乗っている人：脚2ドット幅、胴4ドット幅で、少し前かがみ
+        if (ph) { L(-1, -6, 1, -3, pants); L(0, -6, 2, -3, pants); L(1, -3, 1, 0, pants); L(-2, -6, -1, -2, pants); }
+        else { L(-1, -6, 0, -2, pants); L(0, -6, 1, -2, pants); L(-2, -6, 2, -3, pants); L(2, -3, 2, -1, pants); }
+        R(-3, -7, 4, 1, pants);
+        R(-3, -12, 4, 5, sh); R(-2, -13, 4, 1, sh);
+        L(0, -12, 3, -8, sh); L(1, -12, 3, -7, sh); P(3, -6, sk);
+        // 頭（3×4）と髪、ときどき帽子
+        R(-1, -17, 3, 4, sk); P(1, -15, skd); R(-2, -17, 2, 3, hair); R(-1, -18, 3, 1, b.cap ? fr : hair); if (b.cap) R(1, -17, 2, 1, fr);
+        if (b.x < -18 || b.x > W + 18) { b.on = false; b.next = 50 + Math.random() * 60; }
       }
     },
     glow(g, env, s, t) {
@@ -300,6 +357,18 @@
     }
   });
   function top0(env) { return Math.round(env.H * 0.58) - 30; }
+  // 住宅街を通る電車の色（毎回どれかが来る）
+  const TRAINS = [
+    { body: '#c8362e', roof: '#8a8a88', band: '#f0ece2', bandH: 1, win: '#2e3a48', door: '#a82a24', shade: '#8a2420' },                 // 赤い私鉄（白い帯）
+    { body: '#b8282a', roof: '#7e7e7c', top: '#d84a3e', band: '#f2e8d0', bandH: 2, win: '#2e3a48', door: '#9a2224', shade: '#7a1c1c' }, // 赤とクリーム
+    { body: '#c9cdd2', roof: '#7a7e84', band: '#2f9a5a', bandH: 2, win: '#2e3a48', shade: '#8a8e96', door: '#aeb2b8' },                 // 銀の車体に緑の帯
+    { body: '#c9cdd2', roof: '#7a7e84', band: '#e07830', bandH: 2, band2: '#2a3a8a', win: '#2e3a48', shade: '#8a8e96', door: '#aeb2b8' }, // 銀に橙と紺の帯
+    { body: '#e07830', roof: '#7a7a76', top: '#e88a40', band: '#2f7a4a', bandH: 2, win: '#2e3a48', door: '#c86020', shade: '#9a4a1a' }, // 橙と緑のツートン
+    { body: '#e8d040', roof: '#8a8a84', band: '#e8d040', win: '#2e3a48', door: '#d0b830', shade: '#a08a20' },                            // 黄色い電車
+    { body: '#3a62b8', roof: '#7e8288', band: '#f0f0ea', win: '#1e2a38', door: '#3458a8', shade: '#22407a' },                            // 青い電車
+    { body: '#f0ece2', roof: '#8a8a86', band: '#8a3a9a', bandH: 2, win: '#2e3a48', shade: '#a8a49a', door: '#d8d4c8' },                  // 白に紫の帯
+    { body: '#2e7a4a', roof: '#7a7e7a', band: '#e8d8a0', bandH: 1, win: '#1e2a30', door: '#286a40', shade: '#1c4a2c' }                    // 深緑の古い電車
+  ];
 
   /* ============ アメリカの田舎町 ============ */
   A.add({
@@ -321,7 +390,7 @@
       T.R(0, hz, W, road - hz, env.col('#d8b07a')); T.dith(0, hz, W, road - hz, env.col('#d8b07a'), env.col('#c8a06a'), 0.2);
       for (let i = 0; i < W / 10; i++) { const x = r() * W, y = hz + 2 + r() * (road - hz - 4); A.tuft(T, x, y, r.int(1, 2), env.col('#8a8a4a'), env.col('#a0a058')); }
       // 建物：給水塔・ダイナー・ガソリンスタンド・モーテル
-      const gy = road - 2; s.neon = []; s.wins = [];
+      const gy = road - 2; s.neon = []; s.wins = []; s.signs = []; const late = [];   // 看板は電線のあとに描く（字が電線に隠れないように）
       let x = Math.round(W * 0.04);
       const place = (w, fn) => { if (x + w > W + 10) return; fn(x); x += w + r.int(6, 14); };
       // 給水塔
@@ -331,28 +400,35 @@
         T.R(x0, gy - 14, 36, 14, env.col('#7cc4c0')); T.R(x0, gy - 14, 36, 2, env.col('#e8eef0')); T.H(x0, gy - 7, 36, env.col('#e05050')); T.H(x0, gy - 6, 36, env.col('#e8eef0'));
         for (let k = 3; k < 33; k += 5) { T.R(x0 + k, gy - 12, 4, 4, env.col('#3a4858')); s.wins.push({ x: x0 + k, y: gy - 12, w: 4, h: 4, th: 0.05, ph: 0, per: 999, warm: true, steady: true }); }
         T.R(x0 + 16, gy - 5, 4, 5, env.col('#3a4858'));
-        T.R(x0 + 6, gy - 22, 24, 7, env.col('#2a2a30')); T.V(x0 + 10, gy - 15, 1, env.col('#5a5a5a')); T.V(x0 + 26, gy - 15, 1, env.col('#5a5a5a'));
-        const tw = T.textW('DINER'); T.text('DINER', x0 + 18 - tw / 2, gy - 21, env.col('#e85050')); s.neon.push({ text: 'DINER', x: x0 + 18 - tw / 2, y: gy - 21, c: '#ff5a5a' });
+        const tw = T.textW('DINER'), sx0 = Math.round(x0 + 18 - tw / 2) - 2; s.signs.push([x0 - 2, x0 + 38]);
+        late.push(() => { T.R(sx0, gy - 23, tw + 4, 8, env.col('#2a2a30')); T.H(sx0, gy - 23, tw + 4, env.col('#4a4a52')); T.V(sx0 + 3, gy - 15, 1, env.col('#5a5a5a')); T.V(sx0 + tw, gy - 15, 1, env.col('#5a5a5a')); T.text('DINER', sx0 + 2, gy - 21, env.col('#e85050')); });
+        s.neon.push({ text: 'DINER', x: sx0 + 2, y: gy - 21, c: '#ff5a5a' });
       });
       // ガソリンスタンド
       place(30, x0 => {
         T.R(x0, gy - 16, 30, 3, env.col('#f0f0ec')); T.H(x0, gy - 14, 30, env.col('#d84040'));
         T.V(x0 + 3, gy - 13, 13, env.col('#c8c8c4')); T.V(x0 + 26, gy - 13, 13, env.col('#c8c8c4'));
         for (const px of [x0 + 10, x0 + 18]) { T.R(px, gy - 7, 3, 7, env.col('#d84040')); T.R(px, gy - 6, 3, 2, env.col('#f0f0e8')); T.V(px + 3, gy - 6, 4, env.col('#2a2a2a')); }
-        T.V(x0 + 34, gy - 26, 26, env.col('#6a6a6a')); T.R(x0 + 30, gy - 32, 11, 7, env.col('#f0f0ec')); T.text('GAS', x0 + 31, gy - 31, env.col('#d84040')); s.neon.push({ text: 'GAS', x: x0 + 31, y: gy - 31, c: '#fff0c0', dim: true });
+        const gw = T.textW('GAS') + 4, gx = x0 + 35 - Math.round(gw / 2);
+        T.V(x0 + 34, gy - 26, 26, env.col('#6a6a6a'));
+        late.push(() => { T.R(gx - 1, gy - 33, gw + 2, 9, env.col('#9a9a96')); T.R(gx, gy - 32, gw, 7, env.col('#f0f0ec')); T.H(gx, gy - 26, gw, env.col('#d8d8d2')); T.text('GAS', gx + 2, gy - 31, env.col('#d84040')); });
+        s.neon.push({ text: 'GAS', x: gx + 2, y: gy - 31, c: '#fff0c0', dim: true });
+        s.signs.push([gx - 1, gx + gw + 1]);
         s.canopy = { x: x0, y: gy - 13, w: 30 };
       });
       // モーテル
       place(52, x0 => {
         T.R(x0, gy - 11, 46, 11, env.col('#e8d8b8')); T.R(x0, gy - 13, 46, 2, env.col('#a85a3a'));
         for (let k = 0; k < 6; k++) { const dx = x0 + 3 + k * 7; T.R(dx, gy - 7, 3, 7, env.col(['#3a7ad0', '#d84a4a', '#e0b030'][k % 3])); T.R(dx + 4, gy - 8, 2, 2, env.col('#3a4858')); s.wins.push({ x: dx + 4, y: gy - 8, w: 2, h: 2, th: r(), ph: r(), per: 300 + r() * 400, warm: true }); }
-        const sx = x0 + 48; T.V(sx, gy - 38, 38, env.col('#5a5a5a'));
-        T.R(sx - 10, gy - 44, 22, 8, env.col('#2a6a5a')); T.text('MOTEL', sx - 9, gy - 43, env.col('#f0e8c8')); s.neon.push({ text: 'MOTEL', x: sx - 9, y: gy - 43, c: '#ffe080' });
-        T.R(sx - 8, gy - 35, 32, 7, env.col('#2a2a30')); T.text('VACANCY', sx - 7, gy - 34, env.col('#d84a4a')); s.neon.push({ text: 'VACANCY', x: sx - 7, y: gy - 34, c: '#ff4a4a', flick: true });
+        const sx = x0 + 48; s.signs.push([sx - 11, sx + 30]); T.V(sx, gy - 38, 38, env.col('#5a5a5a'));
+        const mw = T.textW('MOTEL') + 4, vw = T.textW('VACANCY') + 4;
+        late.push(() => { T.R(sx - 10, gy - 44, mw, 8, env.col('#2a6a5a')); T.text('MOTEL', sx - 8, gy - 43, env.col('#f0e8c8')); T.R(sx - 8, gy - 35, vw, 7, env.col('#2a2a30')); T.text('VACANCY', sx - 6, gy - 34, env.col('#d84a4a')); });
+        s.neon.push({ text: 'MOTEL', x: sx - 8, y: gy - 43, c: '#ffe080' }); s.neon.push({ text: 'VACANCY', x: sx - 6, y: gy - 34, c: '#ff4a4a', flick: true });
       });
       // 電柱と電線
-      const poles = []; for (let px = 6; px < W + 40; px += 46) { poles.push(px); T.V(px, gy - 30, 32, env.col('#6a5040')); T.H(px - 4, gy - 28, 9, env.col('#6a5040')); }
+      const poles = []; for (let px = 6; px < W + 40; px += 46) { for (const [a, b] of s.signs) if (px >= a && px <= b) px = b + 3; /* 看板の前に柱が来ないように */ poles.push(px); T.V(px, gy - 30, 32, env.col('#6a5040')); T.H(px - 4, gy - 28, 9, env.col('#6a5040')); }
       for (let i = 0; i + 1 < poles.length; i++) for (const dx of [-4, 4]) A.wire(T, poles[i] + dx, gy - 28, poles[i + 1] + dx, gy - 28, 4, env.col('#2a2a2a'));
+      for (const f of late) f();
       // 道路
       T.R(0, road, W, H - road, env.col('#4a4a4e')); T.H(0, road, W, env.col('#8a8070')); T.H(0, H - 2, W, env.col('#8a8070'));
       const mid = Math.round((road + H) / 2); for (let xx = 0; xx < W; xx += 10) T.R(xx, mid, 6, 1, env.col('#e8c040'));

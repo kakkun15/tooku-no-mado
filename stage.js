@@ -97,15 +97,35 @@
     def.build(E.tools(tg), env, cur.s);
     if (env.weather === 'snow' && def.snowCaps !== false) snowCaps(tg, env);
   }
-  // 雪の日：上に何もない縁に雪を乗せる
+  // 雪の日：上に何もない縁に雪を乗せる。広い面ほど厚く、ところどころこんもりさせ、
+  // 細い物（つる・柱）には1ドットだけ。1本線がずっと続いて見えないようにする
   function snowCaps(g, env) {
-    const id = g.getImageData(0, 0, W, H), d = id.data, c = env.colRGB('#f4f8fc');
-    const lim = def0 => def0;
-    for (let y = H - 1; y >= 1; y--) for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4, j = ((y - 1) * W + x) * 4;
-      if (d[i + 3] > 200 && d[j + 3] < 40 && y > (cur.def.snowFrom ? cur.def.snowFrom(env) : 0)) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; }
+    const id = g.getImageData(0, 0, W, H), d = id.data, c = env.colRGB('#f4f8fc'), c2 = env.colRGB('#d6e0ec');
+    const from = cur.def.snowFrom ? cur.def.snowFrom(env) : 0, n = E.noise1(env.seed + 99);
+    const op = (x, y) => x >= 0 && x < W && y >= 0 && y < H && d[(y * W + x) * 4 + 3] > 200;
+    const edge = (x, y) => op(x, y) && !op(x, y - 1) && y > from;
+    const put = (x, y, col) => { const i = (y * W + x) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; };
+    const jobs = [];
+    for (let y = 1; y < H; y++) {
+      let x = 0;
+      while (x < W) {
+        if (!edge(x, y)) { x++; continue; }
+        let e = x; while (e < W && (edge(e, y) || edge(e, y - 1) || edge(e, y + 1))) e++;
+        jobs.push([x, e, y]); x = e;
+      }
     }
-    g.putImageData(id, 0, 0); lim();
+    for (const [x0, x1, y0] of jobs) {
+      const L = x1 - x0;
+      for (let x = x0; x < x1; x++) {
+        let y = -1; for (let yy = Math.max(1, y0 - 1); yy <= y0 + 1; yy++) if (edge(x, yy)) { y = yy; break; }
+        if (y < 0) continue;
+        const end = Math.min(x - x0, x1 - 1 - x), nv = n(x * 0.35 + y * 0.1);
+        let th = L < 3 ? 1 : 1 + (end >= 1 && nv > 0.38 ? 1 : 0) + (L >= 8 && end >= 2 && nv > 0.62 ? 1 : 0);
+        for (let k = 0; k < th; k++) if (op(x, y + k)) put(x, y + k, k === th - 1 && th > 1 ? c2 : c);
+        if (L >= 6 && end >= 2 && nv > 0.7 && !op(x, y - 1)) put(x, y - 1, c);         // こんもり
+      }
+    }
+    g.putImageData(id, 0, 0);
   }
 
   /* ---------- 毎フレーム ---------- */
@@ -216,6 +236,6 @@
     setRunning: v => { running = v; },
     // 確認用：時間を進めて1枚描く
     _step(seconds) { running = false; let ts = (last || performance.now() / 1000); const n = Math.max(1, Math.round(seconds * 15)); for (let i = 0; i < n; i++) { ts += 1 / 15; frame(ts, true); } },
-    get scale() { return scale; }, get size() { return [W, H]; }, get env() { return cur && cur.env; }
+    get state() { return cur && cur.s; }, get scale() { return scale; }, get size() { return [W, H]; }, get env() { return cur && cur.env; }
   };
 })();

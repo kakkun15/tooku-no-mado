@@ -8,6 +8,13 @@
     return x => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return T[i & 255] * (1 - u) + T[(i + 1) & 255] * u; };
   }
   function fbm(seed, oct) { const ns = []; for (let k = 0; k < (oct || 4); k++) ns.push(noise1(seed + k * 101)); return x => { let v = 0, a = 0.5, f = 1, sum = 0; for (const n of ns) { v += n(x * f) * a; sum += a; a *= 0.5; f *= 2; } return v / sum; }; }
+  // 2次元のなめらかなノイズ（岩肌・水面・砂の模様を、くり返しに見えないようにするため）
+  function noise2(seed) {
+    seed |= 0;
+    const h = (x, y) => { let n = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+    return (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+  }
+  function fbm2(seed, oct) { const ns = []; for (let k = 0; k < (oct || 3); k++) ns.push(noise2(seed + k * 131)); return (x, y) => { let v = 0, a = 0.5, f = 1, sum = 0; for (const n of ns) { v += n(x * f, y * f) * a; sum += a; a *= 0.5; f *= 2; } return v / sum; }; }
   const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
   const bay = (x, y) => BAYER[(y & 3) * 4 + (x & 3)];
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -126,7 +133,7 @@
   }
   const FONT = {
     A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111',
-    K: '101101110101101', L: '100100100100111', M: '1000111011101011000110001', N: '10011101101110011001',  O: '010101101101010', P: '110101110100100', R: '110101110101101', S: '011100010001110', T: '111010010010010',
+    K: '101101110101101', L: '100100100100111', M: '1000111011101011000110001', N: '1000111001101011001110001',  O: '010101101101010', P: '110101110100100', R: '110101110101101', S: '011100010001110', T: '111010010010010',
     U: '101101101101111', V: '101101101101010', W: '1000110001101011101110001', Y: '101101010010010', '0': '111101101101111', '1': '010110010010111', '2': '110001010100111', '6': '011100111101111', '-': '000000111000000', "'": '010010000000000', '.': '000000000000010'
   };
 
@@ -210,24 +217,59 @@
     for (let i = 0; i < n; i++) out.push({ x: r() * env.W | 0, y: Math.pow(r(), 1.4) * env.H | 0, b: 0.4 + r() * 0.6, sp: 0.5 + r() * 2.5, ph: r() * 6, big: r() < 0.04, c: r() < 0.2 ? [255, 220, 200] : r() < 0.3 ? [200, 215, 255] : [255, 255, 245] });
     return out;
   }
-  // 雲：丸をいくつか重ねた形。ゆっくり流れる
+  // 雲：形の種類を混ぜる。ふわふわ（丸の集まり）・入道雲（下が平らで上にもくもく）・すじ雲・横長の層雲
   function makeClouds(env, n, yMax, rng) {
     const out = [];
     const heavy = env.cloudiness >= 0.8;
     if (heavy) n = Math.round(n * 1.3);
+    const puff = (w, h, y, sp) => { const parts = []; for (let k = 0; k < Math.max(3, w / 6); k++) parts.push({ x: rng.range(-w / 2, w / 2), y: rng.range(-h / 3, h / 4), r: rng.range(h * 0.45, h * 0.95) }); return { kind: 'puff', x: rng() * (env.W + 60) - 30, y, w, h, parts, sp }; };
     for (let i = 0; i < n; i++) {
-      const w = heavy ? rng.int(30, 80) : rng.int(14, 46), h = heavy ? rng.int(7, 14) : rng.int(4, 9), parts = [];
-      for (let k = 0; k < Math.max(3, w / 6); k++) parts.push({ x: rng.range(-w / 2, w / 2), y: rng.range(-h / 3, h / 4), r: rng.range(h * 0.45, h * 0.95) });
-      out.push({ x: rng() * (env.W + 60) - 30, y: heavy ? rng.range(-4, yMax * 0.8) : rng.range(4, yMax), w, h, parts, sp: rng.range(0.6, 2.2) * (rng() < 0.5 ? 1 : 0.6) * (heavy ? 0.6 : 1) });
+      const roll = rng();
+      if (!heavy && roll < 0.16) {           // すじ雲（空の高いところ）
+        const w = rng.int(24, 70), lines = [];
+        for (let k = 0; k < rng.int(3, 6); k++) lines.push({ x: rng.range(-w / 2, w / 4), y: k * rng.int(1, 3) + rng.range(-1, 1), w: rng.range(w * 0.3, w * 0.8) });
+        out.push({ kind: 'streak', x: rng() * (env.W + 60) - 30, y: rng.range(2, yMax * 0.45), w, lines, sp: rng.range(0.8, 1.6) });
+      } else if (!heavy && roll < 0.28) {   // 横長の層雲
+        const w = rng.int(40, 90), h = rng.int(3, 5);
+        const c = puff(w, h, rng.range(yMax * 0.3, yMax), rng.range(0.4, 1)); c.kind = 'flat'; c.parts = c.parts.map(p => ({ ...p, y: p.y * 0.4, r: Math.max(3, p.r * 0.8) })); out.push(c);
+      } else {
+        const w = heavy ? rng.int(30, 80) : rng.int(10, 46), h = heavy ? rng.int(7, 14) : rng.int(4, 10);
+        out.push(puff(w, h, heavy ? rng.range(-4, yMax * 0.8) : rng.range(4, yMax), rng.range(0.6, 2.2) * (rng() < 0.5 ? 1 : 0.6) * (heavy ? 0.6 : 1)));
+      }
     }
-    return out;
+    // 入道雲：晴れ・くもりの昼と夕方に、ときどき1つ。地平線の近くから大きく立ちのぼる
+    if (!heavy && env.weather !== 'snow' && env.night < 0.5 && rng() < 0.55) {
+      const W2 = rng.int(34, 64), H2 = Math.round(W2 * rng.range(0.9, 1.4)), parts = [], base = Math.round(yMax * rng.range(0.85, 1.25));
+      for (let k = 0; k < 7; k++) parts.push({ x: (k / 6 - 0.5) * W2 * 0.95 + rng.range(-2, 2), y: -rng.range(2, 6), r: rng.range(W2 * 0.12, W2 * 0.2) });   // 平らな底の段
+      let cx = rng.range(-W2 * 0.1, W2 * 0.1), cy = -W2 * 0.18;
+      for (let k = 0; k < 9; k++) { const f = k / 8, wid = W2 * (0.42 - f * 0.22); for (let j = 0; j < 3; j++) parts.push({ x: cx + rng.range(-wid, wid), y: cy + rng.range(-3, 3), r: rng.range(W2 * (0.16 - f * 0.05), W2 * (0.24 - f * 0.08)) }); cy -= H2 * 0.1; cx += rng.range(-3, 3); }
+      out.push({ kind: 'tower', x: rng() * (env.W + 40) - 20, y: base, w: W2, h: H2, parts, sp: rng.range(0.25, 0.5) });
+    }
+    // 遠いもの（入道雲・すじ雲）を先に描く
+    const order = { tower: 0, streak: 1, flat: 2, puff: 3 };
+    return out.sort((a, b) => order[a.kind] - order[b.kind]);
   }
   function drawClouds(T, env, clouds, t, alpha) {
     const heavy = env.cloudiness >= 0.8, c1 = css(env.sky.cloud, alpha), c2 = css(heavy ? mixc(env.sky.cloud, env.sky.cloudS, 0.45) : env.sky.cloudS, alpha);
+    const hi = css(mixc(env.sky.cloud, [255, 255, 255], 0.5), alpha), mid = css(mixc(env.sky.cloud, env.sky.cloudS, 0.5), alpha), g = T.g;
+    // 下を切った丸（入道雲の平らな底）
+    const circB = (cx, cy, r, c, maxY) => { g.fillStyle = c; for (let y = -r; y <= r; y++) { const yy = Math.round(cy + y); if (yy > maxY) break; const w = Math.floor(Math.sqrt(Math.max(0, r * r - y * y)) + 0.35); g.fillRect(Math.round(cx - w), yy, w * 2 + 1, 1); } };
     for (const c of clouds) {
-      const x = ((c.x + t * c.sp) % (env.W + 80) + env.W + 80) % (env.W + 80) - 40;
-      for (const p of c.parts) T.circ(x + p.x, c.y + p.y + 1, Math.round(p.r), c2);
-      for (const p of c.parts) T.circ(x + p.x, c.y + p.y - 0.5, Math.round(p.r * 0.85), c1);
+      const span = env.W + 80 + (c.w || 0), x = ((c.x + t * c.sp) % span + span) % span - 40 - (c.w || 0) / 2;
+      if (c.kind === 'tower') {
+        const by = c.y;
+        for (const p of c.parts) circB(x + p.x, by + p.y + 1, Math.round(p.r), c2, by);
+        for (const p of c.parts) circB(x + p.x - p.r * 0.12, by + p.y - p.r * 0.15, Math.round(p.r * 0.86), mid, by - 2);
+        for (const p of c.parts) if (p.y < -c.h * 0.15) circB(x + p.x - p.r * 0.25, by + p.y - p.r * 0.3, Math.round(p.r * 0.62), c1, by - 4);
+        g.fillStyle = c2; g.fillRect(Math.round(x - c.w * 0.5), by, Math.round(c.w), 1);
+      } else if (c.kind === 'streak') {
+        g.fillStyle = css(env.sky.cloud, alpha * 0.55);
+        for (const l of c.lines) for (let i = 0; i < l.w; i++) { const e = Math.min(i, l.w - i); if (e > 3 || bay(Math.round(x + l.x + i), Math.round(c.y + l.y)) < e / 4) g.fillRect(Math.round(x + l.x + i), Math.round(c.y + l.y), 1, 1); }
+      } else {
+        for (const p of c.parts) T.circ(x + p.x, c.y + p.y + 1, Math.round(p.r), c2);
+        for (const p of c.parts) T.circ(x + p.x, c.y + p.y - 0.5, Math.round(p.r * 0.85), c1);
+        if (c.kind === 'puff' && !heavy) for (const p of c.parts) if (p.r > 3 && p.y < 0) T.circ(x + p.x - p.r * 0.3, c.y + p.y - p.r * 0.35, Math.round(p.r * 0.35), hi);
+      }
     }
   }
 
@@ -267,5 +309,5 @@
     }
   }
 
-  window.TookuEngine = { RNG, noise1, fbm, bay, clamp, lerp, rgb, css, mixc, todAt, makeEnv, tools, glow, drawSky, makeStars, makeClouds, drawClouds, makeWeather, drawWeather, WEATHER, TOD_NAME, FIXED_HOUR };
+  window.TookuEngine = { RNG, noise1, fbm, noise2, fbm2, bay, clamp, lerp, rgb, css, mixc, todAt, makeEnv, tools, glow, drawSky, makeStars, makeClouds, drawClouds, makeWeather, drawWeather, WEATHER, TOD_NAME, FIXED_HOUR };
 })();
