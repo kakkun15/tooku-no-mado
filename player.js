@@ -1,9 +1,12 @@
 /* とおくの窓：再生（ふつう＝Web Audio／バックグラウンド＝audio要素）と環境音 */
 (function () {
   'use strict';
-  const PIECES = (window.CHILL_MUSIC || []).concat(window.CHILL_MUSIC_CC || []);
+  const PIECES = (window.CHILL_MUSIC || []).concat(window.CHILL_MUSIC_CC || [], window.CHILL_MUSIC_MINE || []);
+  // 怖めに聞こえやすい曲。「怖めの曲をやわらかく」がオンなら、角を丸くして流す
+  const DARK = new Set(['yk_dies', 'mountain', 'toccata', 'revolution', 'prel20', 'ase', 'yk_fubuki']);
+  const isCalm = p => DARK.has(p.id) && P.get('calm') !== false;
   const FAMILY_NAME = { soft: 'やさしい', box: 'オルゴール', chip: 'ファミコン' };
-  const GROUP_NAME = { shuumatsu: '終末ニュースの盤', yukikoro: 'ゆきころバトルの曲', mutopia: '新しく足した曲', cc: '表示が必要な曲（CC）' };
+  const GROUP_NAME = { shuumatsu: '終末ニュースの盤', yukikoro: 'ゆきころバトルの曲', mutopia: '新しく足した曲', cc: '表示が必要な曲（CC）', mine: '持ち込みの曲' };
 
   /* ---------- 合成を別スレッドで ---------- */
   let worker = null, jobs = {}, jobN = 0, local = null;
@@ -90,6 +93,7 @@
     const f = P.get('timbre');
     if (f !== 'auto') return f;
     const r = Math.random();
+    if (isCalm(piece)) return r < 0.6 ? 'box' : 'soft';   // 怖めの曲はオルゴールかやさしい音で
     if (piece.i === 'chip') return r < 0.55 ? 'chip' : r < 0.8 ? 'soft' : 'box';
     return r < 0.55 ? 'soft' : r < 0.8 ? 'box' : 'chip';
   }
@@ -100,7 +104,7 @@
   const emit = () => listeners.forEach(f => { try { f(state()); } catch (e) {} });
   function state() {
     const c = S.cur;
-    return { playing: S.playing, loading: S.loading, piece: c && c.piece, family: c && c.family, familyName: c && FAMILY_NAME[c.family], pos: position(), dur: c ? c.dur : 0 };
+    return { playing: S.playing, loading: S.loading, piece: c && c.piece, family: c && c.family, familyName: c && (FAMILY_NAME[c.family] + (c.opt && c.opt.calm ? '・やわらかアレンジ' : '')), pos: position(), dur: c ? c.dur : 0 };
   }
   function position() {
     if (!S.cur) return 0;
@@ -110,7 +114,7 @@
   async function prepare(id, family) {
     const piece = PIECES.find(p => p.id === id); if (!piece) return null;
     family = family || pickFamily(piece);
-    const bg = P.get('mode') === 'bg', opt = { family, slow: !!P.get('slow'), seed: Math.random() * 1000 | 0 };
+    const bg = P.get('mode') === 'bg', opt = { family, slow: !!P.get('slow'), calm: isCalm(piece), seed: Math.random() * 1000 | 0 };
     const r = await renderJob(piece, opt, bg);
     const item = { piece, family, dur: r.dur, bg, opt };
     if (bg) { item.wav = r.wav; item.url = wavUrl(r.wav); }
@@ -230,6 +234,7 @@
   }
   P.on('timbre', () => rebuild(false));
   P.on('slow', () => rebuild(true));
+  P.on('calm', () => { if (S.next && DARK.has(S.next.piece.id)) { release(S.next); S.next = null; prefetch(); } if (S.cur && DARK.has(S.cur.piece.id)) { const ratio = position() / Math.max(1, S.cur.dur); playId(S.cur.piece.id, undefined, d => ratio * d, !S.playing); } });
   P.on('mode', () => { applyVolumes(); unlock(); rebuild(true); });
   let volT = 0;
   P.on('vol', () => { applyVolumes(); if (FIXED_VOL && P.get('mode') === 'bg') { clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 350); } });
@@ -342,7 +347,7 @@
 
   window.TookuPlayer = {
     sample,
-    PIECES, FAMILY_NAME, GROUP_NAME, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
+    PIECES, DARK, FAMILY_NAME, GROUP_NAME, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
     setAmbience: kinds => { if (ac) setAmbience(kinds); else AMB.pending = kinds; },
     startAmbience: () => { ensureAC(); if (AMB.pending) { const k = AMB.pending; AMB.pending = null; AMB.kinds = ''; setAmbience(k); } },

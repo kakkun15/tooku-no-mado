@@ -16,6 +16,22 @@ function TookuSynth() {
     return out;
   }
 
+  /* ---------- やわらかアレンジ：怖めの曲を、音はそのままに角を丸くする ---------- */
+  // 強弱の差を小さくし、地鳴りのような低い音を1オクターブ上げ、低音のオクターブ重ねを1つにし、大きな太鼓とシンバルをやめる
+  function calmNotes(src) {
+    const out = [];
+    for (const n of src) {
+      if (n.r === 3 && (n.p === 2 || n.p === 5 || n.p === 6)) continue;
+      let p = n.p; if (n.r !== 3) while (p < 36) p += 12;
+      out.push({ t: n.t, d: n.d, p, r: n.r, v: 0.42 + 0.32 * n.v });
+    }
+    const groups = new Map();
+    for (const n of out) { if (n.r === 3) continue; const k = Math.round(n.t * 50); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n); }
+    const drop = new Set();
+    for (const g of groups.values()) for (const a of g) if (a.p < 52 && g.some(b => b !== a && b.p === a.p + 12 && !drop.has(b))) drop.add(a);
+    return out.filter(n => !drop.has(n));
+  }
+
   /* ---------- 波形表 ---------- */
   const tabCache = {};
   function table(h, key) {
@@ -222,7 +238,7 @@ function TookuSynth() {
   /* ---------- 1曲を描き出す ---------- */
   const ROLE_GAIN = [0.62, 1, 0.82, 0.8];
   async function render(piece, opt, onYield) {
-    const notes = decode(piece.n), fam = opt.family, slow = opt.slow ? 1 / 0.88 : 1;
+    const notes = opt.calm ? calmNotes(decode(piece.n)) : decode(piece.n), fam = opt.family, slow = (opt.slow ? 1 / 0.88 : 1) * (opt.calm ? 1 / 0.93 : 1);
     const end = notes.reduce((m, n) => Math.max(m, n.t + n.d), 0) * slow;
     const SR = end > 420 ? 16000 : 22050, tail = fam === 'box' ? 3.5 : 3;
     const total = Math.ceil((end + tail + 0.3) * SR), o = new Float32Array(total);
