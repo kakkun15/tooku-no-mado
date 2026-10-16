@@ -62,6 +62,13 @@
     return ac;
   }
 
+  // 鳴らしはじめ・ほかのアプリから戻ったとき：iPhone などで最初の音だけ大きく出ることがあるので、
+  // 0.12秒ほど無音にしてから、なめらかに元の大きさへ戻す
+  function softStart() {
+    if (ac && master) { const t = ac.currentTime, g = master.gain; try { g.cancelScheduledValues(t); g.setValueAtTime(0.0001, t); g.setValueAtTime(0.0001, t + 0.12); g.linearRampToValueAtTime(1, t + 0.5); } catch (e) {} }
+    if (P.get('mode') === 'bg') { el.muted = true; clearTimeout(softStart.t); softStart.t = setTimeout(() => { el.muted = false; }, 160); }
+  }
+
   /* ---------- 設定 ---------- */
   const P = window.TOOKU_PREFS;
   function applyVolumes() {
@@ -115,12 +122,15 @@
     if (P.get('mode') === 'bg') return el.currentTime || 0;
     return S.playing && ac ? S.offset + (ac.currentTime - S.startAt) : S.offset;
   }
+  // 速さ：ふつう・ゆったり・もっとゆったり（曲の長さを何倍にするか）
+  const TEMPO = [1, 1 / 0.88, 1 / 0.76];
+  if (P.get('slow') === true) P.set('slow', 1); else if (P.get('slow') === false) P.set('slow', 0);
   async function prepare(id, family) {
     const piece = PIECES.find(p => p.id === id); if (!piece) return null;
     // みんなの窓のゲスト：ホストと同じ音色・速さで作る（同じ長さになるように）
     const F = S.follow && S.follow.id === id ? S.follow : null;
     family = F ? F.family : family || pickFamily(piece);
-    const bg = P.get('mode') === 'bg', opt = { family, slow: F ? !!F.slow : !!P.get('slow'), calm: F ? !!F.calm : isCalm(piece), seed: F ? F.seed : Math.random() * 1000 | 0 };
+    const bg = P.get('mode') === 'bg', opt = { family, slow: F ? F.slow : TEMPO[+P.get('slow')] || 1, calm: F ? !!F.calm : isCalm(piece), seed: F ? F.seed : Math.random() * 1000 | 0 };
     const r = await renderJob(piece, opt, bg);
     const item = { piece, family, dur: r.dur, bg, opt };
     if (bg) { item.wav = r.wav; item.url = wavUrl(r.wav); }
@@ -157,6 +167,7 @@
   function startCurrent(offset) {
     const c = S.cur; if (!c) return;
     offset = Math.max(0, Math.min(offset || 0, c.dur - 0.5));
+    if (offset > 0.3 || !S.playing) softStart();
     if (c.bg) {
       stopSource();
       el.src = c.url; el.currentTime = 0;
@@ -200,7 +211,9 @@
   }
   el.addEventListener('ended', () => { if (P.get('mode') === 'bg' && S.cur && S.cur.url && el.src === S.cur.url) advance(); });
   el.addEventListener('pause', () => { if (!swapping && P.get('mode') === 'bg' && !el.ended && S.playing && S.cur && el.src === S.cur.url) { S.playing = false; emit(); } });
-  el.addEventListener('play', () => { if (P.get('mode') === 'bg' && S.cur && el.src === S.cur.url) { S.playing = true; emit(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = performance.now(); });
+  let hiddenAt = 0;
+  el.addEventListener('play', () => { if (hiddenAt && performance.now() - hiddenAt > 500) { hiddenAt = 0; softStart(); } if (P.get('mode') === 'bg' && S.cur && el.src === S.cur.url) { S.playing = true; emit(); } });
 
   function unlock() {           // 最初のタップの中で音の出口を開けておく
     ensureAC();
@@ -269,7 +282,8 @@
 
   // ふつう再生：ページが隠れたら音の出口が止まることがある。戻ったら自動で再開する
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && ac && ac.state !== 'running') { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); }
+    if (document.hidden) return;
+    if (ac && ac.state !== 'running') { softStart(); const r = ac.resume(); if (r && r.catch) r.catch(() => {}); }
   });
 
   /* ================= 環境音 ================= */
@@ -355,17 +369,17 @@
 
   /* ---------- みんなの窓：ホストの曲に合わせる ---------- */
   // ホストが配る今の曲（同じ曲を、同じ音色・速さ・同じところから）
-  function syncState() { const c = S.cur; return c ? { id: c.piece.id, family: c.family, slow: !!(c.opt && c.opt.slow), calm: !!(c.opt && c.opt.calm), seed: c.opt ? c.opt.seed : 0, pos: Math.round(position() * 10) / 10, playing: S.playing } : null; }
+  function syncState() { const c = S.cur; return c ? { id: c.piece.id, family: c.family, slow: (c.opt && c.opt.slow) || 1, calm: !!(c.opt && c.opt.calm), seed: c.opt ? c.opt.seed : 0, pos: Math.round(position() * 10) / 10, playing: S.playing } : null; }
   let userPaused = false;
   function follow(m) {
     if (!m || !PIECES.some(p => p.id === m.id) || !FAMILY_NAME[m.family]) return;
-    S.follow = { id: m.id, family: m.family, slow: !!m.slow, calm: !!m.calm, seed: m.seed | 0, pos: Math.max(0, +m.pos || 0), playing: !!m.playing, recv: performance.now() };
+    S.follow = { id: m.id, family: m.family, slow: Math.min(1.5, Math.max(1, +m.slow || 1)), calm: !!m.calm, seed: m.seed | 0, pos: Math.max(0, +m.pos || 0), playing: !!m.playing, recv: performance.now() };
     applyFollow();
   }
   const expected = () => { const F = S.follow; return F.pos + (F.playing ? (performance.now() - F.recv) / 1000 : 0); };
   function applyFollow() {
     const F = S.follow; if (!F) return;
-    const c = S.cur, same = c && c.piece.id === F.id && c.family === F.family && !!c.opt.slow === F.slow;
+    const c = S.cur, same = c && c.piece.id === F.id && c.family === F.family && Math.abs((c.opt.slow || 1) - F.slow) < 0.001;
     if (!same) { if (S.loading && S.want === F.id + F.family) return; S.want = F.id + F.family; playId(F.id, F.family, () => expected(), !F.playing || userPaused); return; }
     if (userPaused) return;
     if (F.playing && !S.playing) startCurrent(expected());

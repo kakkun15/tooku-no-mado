@@ -51,11 +51,12 @@
       for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28; A.rock(T, env, s.cx + Math.cos(a) * 7, s.cy + Math.sin(a) * 2.5 + 1, 2, 1, 0, snow); }
       T.line(s.cx - 4, s.cy + 1, s.cx + 4, s.cy - 1, env.col('#3e2a1c')); T.line(s.cx - 4, s.cy - 1, s.cx + 4, s.cy + 1, env.col('#4e3422'));
       // フクロウの位置（夜に目が光る）
-      s.owl.x = s.cx + s.rx + 18 < W ? Math.round(s.cx + s.rx + 14) : Math.round(s.cx - s.rx - 16); s.owl.y = hz - 6;
+
       // 手前の草と、画面のふちの大きな木
       for (let x = 0; x < W; x += r.int(4, 9)) if (!snow) A.tuft(T, x, H - r.int(0, 3), r.int(2, 4), env.col('#4d7a3a'), env.col('#6b9a4a'));
       // 画面の両はしの木：背を控えめにし、幹と根元がはっきり見えるように画面の内側へ寄せる
       const big = Math.round((H - hz) * 0.66);
+      s.owl.tree = { x: W - Math.max(8, Math.round(W * 0.05)), y: H - 5 - Math.round(big * 0.88 * 0.55) };
       for (const [x, h, base] of [[Math.max(7, Math.round(W * 0.04)), big, H - 3], [W - Math.max(8, Math.round(W * 0.05)), Math.round(big * 0.88), H - 5]]) {
         const trunkH = Math.round(h * 0.3), tw = h > 34 ? 3 : 2;
         T.R(x - (tw >> 1), base - trunkH, tw, trunkH + 1, env.col('#4a3426'));
@@ -89,7 +90,11 @@
       if (env.night > 0.5) {
         s.owl.next -= dt; if (s.owl.next < 0) { s.owl.next = 45 + Math.random() * 70; if (window.TookuPlayer) window.TookuPlayer.ambEvent('owl'); }
         s.blink -= dt; if (s.blink < -4 - Math.random() * 3) s.blink = 0.15;
-        if (s.blink <= 0) { T.P(s.owl.x, s.owl.y, 'rgba(255,224,110,0.9)'); T.P(s.owl.x + 2, s.owl.y, 'rgba(255,224,110,0.9)'); }
+        // 右の木の枝にとまるフクロウ（夜だけ）。からだの形を見せて、目は2つそろって光り、ときどきまばたき
+        const o = s.owl.tree; if (o) { const ox = o.x - 1, oy = o.y, b = env.col('#5a4636'), b2 = env.col('#3e3026');
+          T.spr(['k...k', 'kbbbk', 'bbbbb', 'bbwbb', '.bbb.', '.f.f.'], ox - 2, oy - 6, { k: b2, b, w: env.col('#8a7458'), f: env.col('#c8a050') });
+          T.H(ox - 4, oy, 9, env.col('#3a2a1e'));
+          if (s.blink <= 0) { T.P(ox - 1, oy - 4, 'rgba(255,224,110,0.95)'); T.P(ox + 1, oy - 4, 'rgba(255,224,110,0.95)'); } else { T.P(ox - 1, oy - 4, b2); T.P(ox + 1, oy - 4, b2); } }
       }
     },
     glow(g, env, s, t) {
@@ -189,16 +194,17 @@
         if (lowest >= f.h - 2) for (let k = 0; k < 6; k++) { const x = Math.floor(Math.random() * f.w); if (s.fallMask.some(([mx, my]) => mx === x && my >= f.h - 2)) T.P(f.x + x + Math.round((Math.random() - 0.5) * 2), f.y + f.h - 1 - Math.random() * 2, env.col('#ffffff', 0.2, 0.8)); }
       }
       // 水の流れ（手前ほど速く長い）
-      const hi = env.col('#cfe8f8', 0, 0.75), hi2 = env.col('#9ccae8', 0, 0.6);
+      const na = 1 - env.night * 0.65, hi = env.col('#cfe8f8', 0, (0.75 * na).toFixed(2)), hi2 = env.col('#9ccae8', 0, (0.6 * na).toFixed(2));   // 夜は流れの筋を控えめに
       for (const p of s.streaks) {
-        p.v += dt * (0.035 + p.v * 0.09) * p.sp; if (p.v > 1) { p.v = 0; p.u = Math.random(); }
+        p.v += dt * (0.03 + p.v * 0.06) * p.sp; if (p.v > 1) { p.v = 0; p.u = Math.random(); }
         const x = lerp(s.xl(p.v), s.xr(p.v), 0.04 + p.u * 0.92), y = s.yv(p.v), L = 1 + Math.round(p.v * (2 + p.l * 6));
         T.R(x, y, L, 1, p.sp > 0.9 ? hi : hi2);
       }
       for (const rk of s.rocks) if (rk.x !== undefined) for (let k = 0; k < 3; k++) T.P(rk.x - rk.w + Math.random() * rk.w * 2, rk.y - rk.h - 1 + Math.random() * 2, env.col('#ffffff', 0, 0.85));
       // 月の映り込み
       const mo = env.skyState.moon;
-      if (mo && env.night > 0.5 && env.weather !== 'fog') for (let k = 0; k < 14; k++) { const v = Math.random(), y = s.yv(v), xc = lerp(s.xl(v), s.xr(v), clamp((mo.x - s.xl(v)) / (s.xr(v) - s.xl(v)), 0.1, 0.9)); T.R(xc - 1 + Math.random() * 3, y, 1 + v * 3, 1, 'rgba(230,236,255,0.55)'); }
+      // 月の映り込み：決まった場所に置き、ゆっくりゆらめかせる（毎回ばらばらに出すと速く流れて見える）
+      if (mo && env.night > 0.5 && env.weather !== 'fog') for (let k = 0; k < 12; k++) { const v = 0.08 + k / 12 * 0.9, y = Math.round(s.yv(v)), xc = lerp(s.xl(v), s.xr(v), clamp((mo.x - s.xl(v)) / (s.xr(v) - s.xl(v)), 0.15, 0.85)), a = 0.25 + 0.3 * (0.5 + 0.5 * Math.sin(t * 0.7 + k * 2.1)); T.R(Math.round(xc - (1 + v * 3) / 2 + Math.sin(t * 0.5 + k) * 1.2), y, Math.round(1 + v * 4), 1, `rgba(230,236,255,${a.toFixed(2)})`); }
       // 雨の波紋
       if (env.weather === 'rain') { if (Math.random() < dt * 10) { const v = 0.1 + Math.random() * 0.9; s.ripples.push({ x: lerp(s.xl(v), s.xr(v), Math.random()), y: s.yv(v), r: 0 }); } }
       s.ripples = s.ripples.filter(q => { q.r += dt * 6; T.ellipse(q.x, q.y, Math.round(q.r), Math.max(0, Math.round(q.r * 0.35)), env.col('#d8ecfa', 0, Math.max(0, 0.5 - q.r * 0.12).toFixed(2))); return q.r < 4; });
@@ -293,12 +299,12 @@
       if (env.weather === 'rain' && env.lights > 0.1) for (const l of s.lamps) for (let y = st + 6; y < env.H; y += 2) if (Math.random() < 0.7) T.R(l.x - 1 + Math.sin(t * 3 + y) * 0.8, y, 2, 1, `rgba(255,214,140,${0.35 * env.lights * (1 - (y - st) / (env.H - st))})`);
       // ハト（昼）
       if (env.night < 0.4 && env.weather !== 'rain') for (const p of s.pigeons) {
-        p.x += Math.sin(t * 0.3 + p.ph) * dt * 2; const peck = Math.sin(t * 2 + p.ph) > 0.6;
+        const vx = Math.sin(t * 0.3 + p.ph); p.x += vx * dt * 2; if (Math.abs(vx) > 0.05) p.face = vx < 0 ? -1 : 1; const peck = Math.sin(t * 2 + p.ph) > 0.6;   // 歩く向きに顔を向ける
         // 輪郭つきのハト（右向き。ふっくらした胴・首の緑・黄色い目・赤い足。ついばむときは頭を下げる）
         const spr = peck
           ? ['..........', '.ooooo....', 'obbbbbooo.', 'owwbbbggho', '.oooooohhe', '...f.f..ok']
           : ['......ooo.', '.....ohhho', '.....ohhek', '.ooooogg..', 'obbbbbbgo.', 'owwbbbbbo.', '.oooooooo.', '...f.f....'];
-        T.spr(spr, p.x - 5, st + (peck ? 5 : 3), { o: env.col('#2a2c33'), b: env.col('#b4b8c4'), w: env.col('#8a8f9c'), g: env.col('#6a9a8a'), h: env.col('#7e8494'), e: env.col('#f0c040'), k: env.col('#d8b0a0'), f: env.col('#e0805a') }, Math.sin(p.ph) < 0);
+        T.spr(spr, p.x - 5, st + (peck ? 5 : 3), { o: env.col('#2a2c33'), b: env.col('#b4b8c4'), w: env.col('#8a8f9c'), g: env.col('#6a9a8a'), h: env.col('#7e8494'), e: env.col('#f0c040'), k: env.col('#d8b0a0'), f: env.col('#e0805a') }, (p.face || 1) < 0);
       }
       // 猫がときどき通る
       s.nextCat -= dt;

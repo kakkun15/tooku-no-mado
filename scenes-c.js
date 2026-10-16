@@ -168,9 +168,13 @@
       // 倒れた標識
       const sx = Math.round(W * 0.2); T.line(sx, road0 - 1, sx + 10, road0 - 6, env.col('#7a7e80')); T.R(sx + 9, road0 - 10, 5, 5, env.col('#3a7a5a')); T.H(sx + 10, road0 - 8, 3, env.col('#e8e8e0'));
       // 道を割って生えた大きな木
-      A.leafy(T, env, Math.round(W * 0.42), road1 + 2, Math.round(26 + (H - hz) * 0.25), 0, { snow, dark: '#2a5a30', mid: '#3a7038', light: '#5a9a48' });
       A.leafy(T, env, Math.round(W * 0.92), road0 + 1, Math.round(20 + (H - hz) * 0.18), 0.1, { snow });
-      A.leafy(T, env, Math.round(W * 0.05), H + 2, Math.round(30 + (H - hz) * 0.3), 0, { snow, dark: '#2a5a30', mid: '#3a7038', light: '#5a9a48' });
+      // 道より手前の2本は別の絵に描き、シカより前に重ねる（シカが木の前を通らないように）
+      const fc = document.createElement('canvas'); fc.width = W; fc.height = H; const fT = E.tools(fc.getContext('2d'));
+      A.leafy(fT, env, Math.round(W * 0.42), road1 + 2, Math.round(26 + (H - hz) * 0.25), 0, { snow, dark: '#2a5a30', mid: '#3a7038', light: '#5a9a48' });
+      A.leafy(fT, env, Math.round(W * 0.05), H + 2, Math.round(30 + (H - hz) * 0.3), 0, { snow, dark: '#2a5a30', mid: '#3a7038', light: '#5a9a48' });
+      if (snow) A.snowEdges(fc.getContext('2d'), env);
+      s.fg = fc;
       s.roadY = (road0 + road1) / 2;
     },
     front(T, env, s, t, dt) {
@@ -183,6 +187,7 @@
         const spr = eat ? ['.........', 'bbbbbb...', 'bbbbbbbh.', 'bb...bbhh', 'b.b..b.b.', 'b.b..b.b.'] : ['......a.a', '......hh.', 'bbbbbbbh.', 'bbbbbb...', fr ? 'b.b..b.b.' : '.b.b..bb.', fr ? 'b.b..b.b.' : '.b.b..b.b'];
         T.spr(spr, d.x - 4, y - 6, { b: env.col('#a06a3a'), h: env.col('#8a5a30'), a: env.col('#6a4a2a') }, d.dir < 0);
       }
+      if (s.fg) T.g.drawImage(s.fg, 0, 0);
       // チョウ
       if (env.night < 0.4 && env.weather === 'clear') for (const b of s.butter) { b.x += Math.sin(t * 0.7 + b.y) * 0.4; b.y += Math.cos(t * 1.1 + b.x * 0.1) * 0.3; b.x = (b.x + W) % W; b.y = clamp(b.y, s.hz + 2, H - 2); const up = Math.sin(t * 14 + b.x) > 0; T.P(b.x, b.y, env.col(b.c)); if (up) { T.P(b.x - 1, b.y - 1, env.col(b.c)); T.P(b.x + 1, b.y - 1, env.col(b.c)); } }
       A.birds(T, env, s, t, dt, { y0: H * 0.1, y1: s.hz * 0.6 });
@@ -218,8 +223,10 @@
       // 崖：地層の縞をノイズでゆらし、ひびと草の垂れを足す
       const cx0 = Math.round(W * (W > H ? 0.72 : 0.6)), ctop = Math.round(hz - (H - hz) * 0.35), n = fbm(env.seed + 3, 3);
       const cy = x => { const f = (x - cx0) / (W - cx0 + 1); return Math.round(ctop + (1 - Math.min(1, f * 4)) * 14 + n(x * 0.2) * 4); };
-      A.stoneFill(T, env, cx0, W, cy, () => H, { seed: env.seed + 31, sx: 0.08, sy: 0.3, pal: ['#4e4842', '#5e5650', '#6e665e', '#7e756c', '#8e857a'], crack: '#3e3834', speck: '#a49a8e',
-        light: (x, y) => (x < cx0 + 6 ? -0.18 : 0) + (y - cy(x)) * -0.003 });
+      // 崖は、ドット絵らしく色数を3つにしぼり、大きな段（岩棚）で描く。こまかいひびや点は入れない
+      A.stoneFill(T, env, cx0, W, cy, () => H, { seed: env.seed + 31, sx: 0.035, sy: 0.09, pal: ['#5e5650', '#706860', '#857c72'],
+        light: (x, y) => (x < cx0 + 6 ? -0.25 : 0.04) });
+      { const ln = noise1(env.seed + 33); for (let k = 0; k < 6; k++) { const y0 = ctop + 10 + k * Math.round((H - ctop) / 6.5); for (let x = cx0 + 2; x < W; x++) { if (ln(x * 0.08 + k * 7) < 0.42) continue; const y = Math.round(y0 + (ln(x * 0.05 + k) - 0.5) * 6); if (y > cy(x) + 3 && y < H) { T.P(x, y, env.col('#4e4842')); T.P(x, y - 1, env.col('#968c80')); } } } }
       for (let x = cx0; x < W; x++) { const y = cy(x); T.R(x, y - 1, 1, 2, env.col('#5a8a42')); if (n(x * 0.9) > 0.62) T.R(x, y + 1, 1, Math.round(n(x * 1.7) * 6), env.col('#4a7a3a')); }
       const lx = Math.round(cx0 + Math.min(18, (W - cx0) * 0.45)), ly = Math.round(ctop + n(lx * 0.2) * 4);
       T.poly([[lx - 4, ly], [lx - 3, ly - 22], [lx + 3, ly - 22], [lx + 4, ly]], env.col('#f0ece4'));

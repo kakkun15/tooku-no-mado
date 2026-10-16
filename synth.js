@@ -238,7 +238,7 @@ function TookuSynth() {
   /* ---------- 1曲を描き出す ---------- */
   const ROLE_GAIN = [0.62, 1, 0.82, 0.8];
   async function render(piece, opt, onYield) {
-    const notes = opt.calm ? calmNotes(decode(piece.n)) : decode(piece.n), fam = opt.family, slow = (opt.slow ? 1 / 0.88 : 1) * (opt.calm ? 1 / 0.93 : 1);
+    const notes = opt.calm ? calmNotes(decode(piece.n)) : decode(piece.n), fam = opt.family, slow = (typeof opt.slow === 'number' ? Math.max(1, Math.min(1.5, opt.slow)) : opt.slow ? 1 / 0.88 : 1) * (opt.calm ? 1 / 0.93 : 1);
     const end = notes.reduce((m, n) => Math.max(m, n.t + n.d), 0) * slow;
     const SR = end > 420 ? 16000 : 22050, tail = fam === 'box' ? 3.5 : 3;
     const total = Math.ceil((end + tail + 0.3) * SR), o = new Float32Array(total);
@@ -264,7 +264,7 @@ function TookuSynth() {
       } else {                                               // やさしい
         const g = 0.2 * vg * rg;
         if (inst === 'guitar') pluck(o, i0, nt, SR, g * 1.15, 0.55, false);
-        else if (inst === 'koto') pluck(o, i0, nt, SR, g * 1.2, 0.95, true);
+        else if (inst === 'koto') pluck(o, i0, nt, SR, g * 1.05, 0.62, true);   // 箏：はじく音が鋭すぎて驚かないように、明るさを抑える
         else if (inst === 'musicbox') musicbox(o, i0, nt, SR, g * 0.85);
         else if (inst === 'strings') { if (nt.r === 1) pad(o, i0, nt, SR, g * 1.1, 0.07, 0.3, true); else pad(o, i0, nt, SR, g * 0.8, 0.14, 0.4, false); }
         else if (inst === 'organ') { if (nt.r === 1) flute(o, i0, nt, SR, g * 0.95); else organ(o, i0, nt, SR, g * 0.75); }
@@ -280,7 +280,11 @@ function TookuSynth() {
     let sq = 0, pk = 0, cnt = 0;
     for (let i = 0; i < total; i += 4) { const a = Math.abs(o[i]); sq += a * a; cnt++; if (a > pk) pk = a; }
     const rms = Math.sqrt(sq / Math.max(1, cnt)) || 1e-4;
-    const g = Math.min(0.14 / rms, 1.15 / Math.max(pk, 1e-4));
+    // 大きいところ（0.05秒ごとの音量の上位5%）もそろえる。はじく音の曲だけ急に大きく聞こえないように
+    const win = Math.round(SR * 0.05), ws = [];
+    for (let i = 0; i + win <= total; i += win) { let s2 = 0; for (let j = i; j < i + win; j += 2) s2 += o[j] * o[j]; ws.push(s2 / (win / 2)); }
+    ws.sort((a, b) => a - b); const p95 = Math.sqrt(ws[Math.floor(ws.length * 0.95)] || 1e-8) || 1e-4;
+    const g = Math.min(0.14 / rms, 0.19 / p95, (inst === 'koto' || inst === 'guitar' ? 0.9 : 1.15) / Math.max(pk, 1e-4));
     for (let i = 0; i < total; i++) { const x = o[i] * g; o[i] = x > 0.85 ? 0.85 + Math.tanh((x - 0.85) * 4) * 0.13 : x < -0.85 ? -0.85 - Math.tanh((-x - 0.85) * 4) * 0.13 : x; }
     // 頭と終わりを静かに
     const fi = Math.min(total, (0.25 * SR) | 0); for (let i = 0; i < fi; i++) o[i] *= i / fi;

@@ -7,33 +7,46 @@
   /* 地平線の位置：横長なら下寄り、縦長なら手前を広く */
   const groundDepth = (H, frac, lo, hi) => clamp(Math.round(H * frac), lo, hi);
 
-  /* 針葉樹。snow なら枝に雪 */
+  /* 針葉樹：数段の三角を重ねた形。段の数は木の高さに比例させすぎない（大きな木が細かい縞にならないように）。
+     snow なら各段の上側に雪 */
   function pine(T, env, x, base, h, depth, opt) {
     opt = opt || {};
-    const dark = env.col(opt.dark || '#1e4434', depth), light = env.col(opt.light || '#2d5e44', depth), snow = env.col('#f2f6fb', depth), trunk = env.col('#4a3426', depth);
-    const top = base - h, tiers = Math.max(2, Math.round(h / 6)), wMax = Math.max(2, h * (opt.wide || 0.36));
-    T.R(x, base - Math.max(2, h * 0.16), 1, Math.max(2, h * 0.16) + 1, trunk);
-    for (let y = top; y < base - h * 0.12; y++) {
-      const f = (y - top) / (h * 0.88), tierF = (f * tiers) % 1, hw = Math.max(0, (0.25 + 0.75 * f) * wMax * (0.55 + 0.45 * tierF));
-      const w = Math.round(hw);
-      T.R(x - w, y, w * 2 + 1, 1, dark);
-      if (w > 0) T.R(x - w, y, Math.max(1, Math.round(w * 0.7)), 1, light);
-      if (opt.snow && tierF < 0.34 && w > 0) T.R(x - w, y, Math.max(1, w + 1), 1, snow);
+    const dark = env.col(opt.dark || '#1e4434', depth), light = env.col(opt.light || '#2d5e44', depth), deep = env.col('#142e24', depth), snow = env.col('#f2f6fb', depth), snow2 = env.col('#d4dfec', depth), trunk = env.col('#4a3426', depth);
+    h = Math.max(4, Math.round(h));
+    const top = base - h, tiers = clamp(Math.round(h / 9), 2, 6), wMax = Math.max(2, h * (opt.wide || 0.36));
+    const trunkH = Math.max(2, Math.round(h * 0.14));
+    T.R(x - (h > 30 ? 1 : 0), base - trunkH, h > 30 ? 2 : 1, trunkH + 1, trunk);
+    const crownH = h - trunkH * 0.6, th = crownH / (tiers * 0.72 + 0.28);    // 段は少しずつ重ねる
+    for (let k = 0; k < tiers; k++) {
+      const t0 = top + k * th * 0.72, t1 = t0 + th, wTop = k === 0 ? 0 : wMax * (0.18 + 0.5 * k / tiers), wBot = wMax * (0.45 + 0.55 * (k + 1) / tiers);
+      for (let y = Math.round(t0); y < Math.min(t1, base - trunkH * 0.6); y++) {
+        const f = (y - t0) / th, hw = Math.round(wTop + (wBot - wTop) * Math.pow(f, 0.85));
+        if (hw < 0) continue;
+        T.R(x - hw, y, hw * 2 + 1, 1, dark);
+        if (hw > 0) T.R(x - hw, y, Math.max(1, Math.round(hw * 0.75)), 1, light);
+        if (y >= t1 - 1.5 && hw > 1) T.R(x - hw + 1, y, hw * 2 - 1, 1, deep);     // 段の下の影
+        if (opt.snow && f < 0.42 && hw > 0) { const sw = Math.max(1, Math.round(hw * (1.6 - f * 2))); T.R(x - hw, y, sw, 1, f > 0.3 ? snow2 : snow); }
+      }
     }
     if (opt.snow) T.P(x, top, snow);
   }
-  /* 広葉樹：丸い葉の塊をいくつか */
+  /* 広葉樹：まん中の大きな塊のまわりに、上半分を囲むように塊を並べる（ばらばらに置くと形が崩れることがある） */
   function leafy(T, env, x, base, h, depth, opt) {
     opt = opt || {};
     const r = RNG(Math.round(x * 13 + base * 7 + h)), trunkH = Math.round(h * 0.38);
     const cT = env.col(opt.trunk || '#5a4030', depth), c1 = env.col(opt.dark || '#2f6236', depth), c2 = env.col(opt.mid || '#3f7a3e', depth), c3 = env.col(opt.light || '#5c9a4a', depth);
     T.R(x - (h > 18 ? 1 : 0), base - trunkH, h > 18 ? 3 : 2, trunkH + 1, cT);
-    if (h > 14) { T.line(x, base - trunkH * 0.7, x - h * 0.18, base - trunkH * 1.2, cT); T.line(x + 1, base - trunkH * 0.8, x + h * 0.2, base - trunkH * 1.25, cT); }
-    const cy = base - trunkH - h * 0.28, rw = h * 0.36, blobs = [];
-    for (let k = 0; k < 5 + h / 6; k++) blobs.push([x + r.range(-rw, rw), cy + r.range(-h * 0.26, h * 0.18), Math.max(2, Math.round(r.range(h * 0.16, h * 0.28)))]);
+    if (h > 14) { T.line(x, base - trunkH * 0.7, x - h * 0.16, base - trunkH * 1.15, cT); T.line(x + 1, base - trunkH * 0.8, x + h * 0.18, base - trunkH * 1.2, cT); }
+    const cy = base - trunkH - h * 0.26, rw = h * 0.34, R0 = Math.max(2, Math.round(h * 0.26)), blobs = [[x, cy, R0]];
+    const n = 4 + Math.min(4, Math.floor(h / 10)), tilt = r.range(-0.25, 0.25);
+    for (let k = 0; k < n; k++) {
+      const a = Math.PI * (1.05 + 0.9 * k / (n - 1)) + tilt + r.range(-0.12, 0.12);     // 左下→上→右下
+      blobs.push([x + Math.cos(a) * rw * r.range(0.72, 0.9), cy + Math.sin(a) * h * 0.2 * r.range(0.8, 1), Math.max(2, Math.round(R0 * r.range(0.62, 0.8)))]);
+    }
+    blobs.push([x - rw * 0.55, cy + h * 0.08, Math.max(2, Math.round(R0 * 0.7))], [x + rw * 0.55, cy + h * 0.09, Math.max(2, Math.round(R0 * 0.68))]);
     for (const [bx, by, br] of blobs) T.circ(bx, by + 1, br, c1);
     for (const [bx, by, br] of blobs) T.circ(bx - 0.5, by - 0.5, Math.max(1, br - 1), c2);
-    for (const [bx, by, br] of blobs) if (br > 2) T.circ(bx - br * 0.35, by - br * 0.4, Math.max(1, Math.round(br * 0.45)), c3);
+    for (const [bx, by, br] of blobs) if (br > 2 && by < cy + 1) T.circ(bx - br * 0.35, by - br * 0.4, Math.max(1, Math.round(br * 0.42)), c3);
     // 雪：葉の塊の上側に、丸みに沿って帽子のように積もらせる（1本線にしない）
     if (opt.snow) {
       const sw = env.col('#f2f6fb', depth), ss = env.col('#d4dfec', depth);
