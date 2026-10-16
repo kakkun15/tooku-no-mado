@@ -30,6 +30,50 @@
     }
     if (opt.snow) T.P(x, top, snow);
   }
+  /* 手前の大きな針葉樹：段を下から描いて上の段の裾が下の段にかぶさるようにする。
+     裾は枝先でぎざぎざ、左の面に日が当たる。雪は各段の肩に、下の縁を波打たせて乗せる（横の縞にしない） */
+  function bigPine(T, env, x, base, h, depth, opt) {
+    opt = opt || {};
+    const col = c => env.col(c, depth);
+    const lt = col(opt.light || '#2f6448'), md = col(opt.mid || '#22503a'), dk = col(opt.dark || '#173a2c'), deep = col('#0f2a20');
+    const sw = col('#f4f7fb'), ss = col('#cfdaea'), sd = col('#b4c2d8'), tk = col('#4a3426'), tk2 = col('#33241a');
+    const nz = noise1(Math.round(x * 7 + h * 3));
+    h = Math.max(20, Math.round(h));
+    const top = base - h, trunkH = Math.round(h * 0.1), trunkW = Math.max(2, Math.round(h * 0.035));
+    const tiers = clamp(Math.round(h / 22), 4, 8), wMax = h * (opt.wide || 0.34);
+    const crownH = h - trunkH, th = crownH / (tiers * 0.6 + 0.4), step = th * 0.6;
+    // 幹（左を明るく）
+    for (let i = 0; i < trunkW; i++) T.R(x - (trunkW >> 1) + i, base - trunkH - 2, 1, trunkH + 3, i < trunkW / 2 ? tk : tk2);
+    const tier = k => {
+      const t0 = top + k * step, wB = wMax * (0.3 + 0.7 * Math.pow((k + 1) / tiers, 0.9)), wT = k === 0 ? 0 : wMax * (0.3 + 0.7 * Math.pow(k / tiers, 0.9)) * 0.42;
+      return { t0, t1: t0 + th, wB, wT };
+    };
+    // 裾の下の縁：まん中が少し上がり、枝先ごとにぎざぎざ
+    const bottom = (tr, dx, k) => { const a = Math.abs(dx) / Math.max(1, tr.wB); return tr.t1 - (1 - a) * th * 0.12 - ((((Math.abs(dx) + k * 3) / 3) | 0) % 2 ? 1 : 0); };
+    for (let k = tiers - 1; k >= 0; k--) {
+      const tr = tier(k), up = k > 0 ? tier(k - 1) : null;
+      const yEnd = Math.ceil(tr.t1 + 1);
+      for (let y = Math.round(tr.t0); y <= yEnd; y++) {
+        const f = clamp((y - tr.t0) / th, 0, 1), hw0 = tr.wT + (tr.wB - tr.wT) * Math.pow(f, 0.9);
+        const jag = ((y + k * 2) % 3 === 0) ? 1 : 0;     // 横の縁も枝先で少しぎざぎざ
+        const hw = Math.round(hw0 + jag);
+        for (let dx = -hw; dx <= hw; dx++) {
+          if (y > bottom(tr, dx, k)) continue;
+          const u = dx / Math.max(1, hw), xx = x + dx;
+          let c = u < -0.3 ? lt : u > 0.45 ? dk : md;
+          let snowy = false;
+          if (opt.snow) {
+            const sF = 0.4 + 0.34 * Math.pow(Math.abs(u), 1.3) + 0.12 * (nz(xx * 0.45 + k * 7.3) - 0.5);     // 外の枝先ほど雪が下まで
+            if (f < sF) { c = u > 0.72 ? sd : (u > 0.35 || f > sF - 0.07) ? ss : sw; snowy = true; }
+            else if (f < sF + 0.12 && ((xx * 5 + k) % 7) === 0) { c = ss; snowy = true; }  // ところどころ垂れる
+          }
+          if (up && Math.abs(dx) < up.wB) { const by = bottom(up, dx, k - 1); if (y > by && y <= by + (snowy ? 1 : 2)) c = snowy ? ss : deep; }   // 上の段の裾の影
+          T.P(xx, y, c);
+        }
+      }
+    }
+    if (opt.snow) { T.P(x, top - 1, sw); T.P(x, top, sw); }
+  }
   /* 広葉樹：まん中の大きな塊のまわりに、上半分を囲むように塊を並べる（ばらばらに置くと形が崩れることがある） */
   function leafy(T, env, x, base, h, depth, opt) {
     opt = opt || {};
@@ -155,5 +199,5 @@
     for (let y = H - 1; y >= 1; y--) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4, j = ((y - 1) * W + x) * 4; if (d[i + 3] > 200 && d[j + 3] < 40) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } }
     g.putImageData(id, 0, 0);
   }
-  window.TookuArt = { SCENES, add, stoneFill, groundDepth, pine, leafy, palm, tuft, rock, birds, fireflies, windowLights, makeWindow, wire, snowEdges };
+  window.TookuArt = { SCENES, add, stoneFill, groundDepth, pine, bigPine, leafy, palm, tuft, rock, birds, fireflies, windowLights, makeWindow, wire, snowEdges };
 })();

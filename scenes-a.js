@@ -374,9 +374,18 @@
       T.R(L.x - 1, L.y - 6, 3, 6, env.col('#4a2e1e'));
       T.R(L.x - lw / 2 - 2, L.y, lw + 4, 2, env.col('#f6f9fc'));
       s.chim = { x: L.x + 7, y: L.y - lh - 16 };
-      // 手前の大きな木
-      A.pine(T, env, 3, H + 2, Math.round((H - hz) * 0.9), 0, { snow: true, wide: 0.4, dark: '#1e4434', light: '#2a5a42' });
-      A.pine(T, env, W - 4, H + 4, Math.round((H - hz) * 0.75), 0, { snow: true, wide: 0.4, dark: '#1e4434', light: '#2a5a42' });
+      // 手前の大きな木は別の絵に描き、雪だるまと子どもより前に重ねる（木の上に雪だるまが乗って見えないように）
+      const fc = document.createElement('canvas'); fc.width = W; fc.height = H; const fg = fc.getContext('2d'), fT = E.tools(fg);
+      const big = Math.min(Math.max(H - hz, H * 0.56), W * 1.1);
+      A.bigPine(fT, env, Math.round(W * 0.02), H + 2, Math.round(big * 0.86), 0, { snow: true });
+      A.bigPine(fT, env, Math.round(W * 0.98), H + 3, Math.round(big * 0.72), 0, { snow: true });
+      s.fg = fc;
+      // 雪だるまを作れる横の範囲：子どもの目の高さで木にかからないところ
+      const row = fg.getImageData(0, s.gy - 12, W, 1).data, solid = x => row[x * 4 + 3] > 100;
+      let a = 0; while (a < W && solid(a)) a++;
+      let b = W - 1; while (b > a && solid(b)) b--;
+      s.free = [a + 8, b - 8];
+      if (s.men[0] && !s.men[0].placed) { s.men[0].x = Math.round(a + 10); s.men[0].placed = true; }
     },
     front(T, env, s, t, dt) {
       const { W } = env, sn = '#f6f9fc', sh = '#c8d4e4';
@@ -404,14 +413,14 @@
       };
       s.men.forEach(drawMan);
       const kidsOut = env.night < 0.6;
-      if (!kidsOut) return;
+      if (!kidsOut) { if (s.fg) T.g.drawImage(s.fg, 0, 0); return; }
       // 子どもたちの作業
       const K = s.kids;
       s.timer -= dt;
       const walkTo = (k, x, sp) => { const d = x - k.x; if (Math.abs(d) < 0.6) { k.walk = 0; return true; } k.dir = Math.sign(d); k.x += Math.sign(d) * Math.min(Math.abs(d), sp * dt); k.walk += dt; return false; };
       if (s.phase === 'start' && s.timer < 0) {
         const used = s.men.map(m => m.x);
-        let bx = 0; for (let tries = 0; tries < 20; tries++) { bx = W * (0.18 + Math.random() * 0.5); if (used.every(u => Math.abs(u - bx) > 18) && Math.abs(bx - s.lodge.x) > 22) break; }
+        let bx = 0; for (let tries = 0; tries < 20; tries++) { const F = s.free || [W * 0.18, W * 0.68]; bx = F[0] + 14 + Math.random() * Math.max(1, F[1] - F[0] - 28); if (used.every(u => Math.abs(u - bx) > 18) && Math.abs(bx - s.lodge.x) > 22) break; }
         bx = Math.round(bx);
         const dirA = Math.random() < 0.5 ? 1 : -1;
         s.build = { bx, base: { x: bx - dirA * 36, r: 1.5, target: 6, dir: dirA, kid: 0, stop: bx }, head: { x: bx + dirA * 30, r: 1.5, target: 4, dir: -dirA, kid: 1, stop: bx + dirA * 11 } };
@@ -436,7 +445,7 @@
         if (s.timer < 0) { s.man.liftP = 1; s.phase = 'deco'; s.timer = 4; }
       }
       if (s.phase === 'deco') { s.man.deco = Math.min(1, 1 - s.timer / 4); if (s.timer < 0) { s.phase = 'cheer'; s.timer = 3.5; s.men.push(s.man); if (s.men.length > 3) s.men.shift(); s.man = null; } }
-      if (s.phase === 'cheer') { for (const k of K) k.jump = Math.abs(Math.sin(t * 7 + k.x)) * 3; if (s.timer < 0) { for (const k of K) k.jump = 0; s.phase = 'rest'; s.timer = 10 + Math.random() * 10; s.dest = K.map(() => W * (0.15 + Math.random() * 0.6)); } }
+      if (s.phase === 'cheer') { for (const k of K) k.jump = Math.abs(Math.sin(t * 7 + k.x)) * 3; if (s.timer < 0) { for (const k of K) k.jump = 0; s.phase = 'rest'; s.timer = 10 + Math.random() * 10; s.dest = K.map(() => { const F = s.free || [W * 0.15, W * 0.75]; return F[0] + Math.random() * (F[1] - F[0]); }); } }
       if (s.phase === 'rest') { K.forEach((k, i) => walkTo(k, s.dest[i], 5)); if (s.timer < 0) { s.phase = 'start'; s.timer = 0.5; } }
       // 作りかけ
       if (s.man) drawMan(s.man);
@@ -445,6 +454,7 @@
         const fr = KID[Math.floor(k.walk * 6) % 2], map = { H: env.col(k.c[0]), F: env.col('#f2caa0'), S: env.col(k.c[1]), J: env.col(k.c[2]), L: env.col('#3a3f58') };
         T.spr(fr, k.x - 2, s.gy - 7 - (k.jump || 0), map, k.dir < 0);
       }
+      if (s.fg) T.g.drawImage(s.fg, 0, 0);
     },
     glow(g, env, s, t) { A.windowLights(g, env, s, s.wins || [], t); if (env.lights > 0.1) glow(g, s.lodge.x, s.lodge.y - 6, 20, '#ffb060', 0.25 * env.lights, 4); }
   });
