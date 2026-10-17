@@ -5,7 +5,10 @@
   const { RNG } = E;
   const Q = new URLSearchParams(location.search);   // 確認用：?scene=river&hour=18&weather=rain
 
-  let view, vg, W = 0, H = 0, scale = 1;
+  // W・H は景色の大きさ。眺め方（窓・テレビ・パソコン）を選んでいると、画面（VW・VH）より小さい四角 FR の中に描く
+  let view, vctx, vg, W = 0, H = 0, VW = 0, VH = 0, FR = { x: 0, y: 0, w: 0, h: 0 }, scale = 1;
+  const scC = document.createElement('canvas');
+  const frameKind = () => (window.TookuFrame && P.get('frame')) || 'none';
   const skyC = document.createElement('canvas'), stC = document.createElement('canvas');
   let cur = null, last = 0, tStart = performance.now() / 1000, running = true, trans = null;
   const listeners = new Set(), overlays = [];
@@ -41,7 +44,10 @@
     scale = Math.max(2, Math.round(Math.min(cw, ch) / target));
     const nW = Math.ceil(cw / scale), nH = Math.ceil(ch / scale);
     view.style.width = nW * scale + 'px'; view.style.height = nH * scale + 'px';
-    if (nW !== W || nH !== H) { W = nW; H = nH; view.width = W; view.height = H; vg = view.getContext('2d'); vg.imageSmoothingEnabled = false; if (cur) enter(cur.def, cur.weatherKey, 'seed'); }
+    if (nW !== VW || nH !== VH || !vctx) { VW = nW; VH = nH; view.width = VW; view.height = VH; vctx = view.getContext('2d'); vctx.imageSmoothingEnabled = false; }
+    const k = frameKind();
+    FR = k === 'none' ? { x: 0, y: 0, w: VW, h: VH } : window.TookuFrame.layout(k, VW, VH);
+    if (FR.w !== W || FR.h !== H || !vg) { W = FR.w; H = FR.h; scC.width = W; scC.height = H; vg = scC.getContext('2d'); vg.imageSmoothingEnabled = false; trans = null; if (cur) enter(cur.def, cur.weatherKey, 'seed'); }
   }
 
   /* ---------- 時刻と天気 ---------- */
@@ -150,8 +156,14 @@
     if (def.glow) { vg.save(); def.glow(vg, env, s, t, dt); vg.restore(); }
     E.drawWeather(T, env, cur.wthr, t, dt, def.wind ? def.wind(env, t) : undefined);
     if (def.over) def.over(T, env, s, t, dt);
-    for (const f of overlays) { try { f(T, env, t, dt); } catch (e) { console.warn(e); } }
     if (trans) drawTrans(ts);
+    // 画面へ：景色を四角に置き、まわりに部屋を描く。アバターは部屋の手前に
+    const VT = E.tools(vctx), k = frameKind();
+    vctx.globalCompositeOperation = 'source-over'; vctx.globalAlpha = 1;
+    if (k !== 'none') vctx.clearRect(0, 0, VW, VH);
+    vctx.drawImage(scC, FR.x, FR.y);
+    if (k !== 'none') { const fr = window.TookuFrame.draw(k, VW, VH, FR, env); vctx.drawImage(fr.cv, 0, 0); window.TookuFrame.live(VT, fr.info, t); }
+    for (const f of overlays) { try { f(VT, env, t, dt); } catch (e) { console.warn(e); } }
   }
   // ドットがぱらぱら入れ替わる切り替え
   function drawTrans(ts) {
@@ -200,9 +212,9 @@
     if (window.visualViewport) window.visualViewport.addEventListener('resize', refit);
     // それでも景色の外にすき間ができたときに目立たないよう、ページの地の色を景色のいちばん下の色に合わせる
     setInterval(() => {
-      if (!vg || !W || !H) return;
+      if (!vctx || !VW || !VH) return;
       try {
-        const d = vg.getImageData(0, H - 1, W, 1).data; let r = 0, g = 0, b = 0, n = 0;
+        const d = vctx.getImageData(0, VH - 1, VW, 1).data; let r = 0, g = 0, b = 0, n = 0;
         for (let i = 0; i < d.length; i += 16) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
         const c = `rgb(${r / n | 0},${g / n | 0},${b / n | 0})`;
         document.documentElement.style.background = c; document.body.style.background = c;
@@ -211,7 +223,8 @@
       } catch (e) {}
     }, 2000);
     // 大きさの通知が来ないまま変わることもあるので、ときどき確かめる（ずれていなければ何もしない）
-    setInterval(() => { const [cw, ch] = screenSize(); if (Math.ceil(cw / scale) !== W || Math.ceil(ch / scale) !== H) fit(); }, 1500);
+    setInterval(() => { const [cw, ch] = screenSize(); if (Math.ceil(cw / scale) !== VW || Math.ceil(ch / scale) !== VH) fit(); }, 1500);
+    P.on('frame', () => fit());
     const first = Q.get('scene') || (P.get('scene') !== 'auto' ? P.get('scene') : pickNext());
     go(first, { instant: true });
     schedule();
@@ -263,6 +276,6 @@
     setRunning: v => { running = v; },
     // 確認用：時間を進めて1枚描く
     _step(seconds) { running = false; let ts = (last || performance.now() / 1000); const n = Math.max(1, Math.round(seconds * 15)); for (let i = 0; i < n; i++) { ts += 1 / 15; frame(ts, true); } },
-    get state() { return cur && cur.s; }, get scale() { return scale; }, get size() { return [W, H]; }, get env() { return cur && cur.env; }
+    get state() { return cur && cur.s; }, get scale() { return scale; }, get size() { return [VW, VH]; }, get frameRect() { return FR; }, get env() { return cur && cur.env; }
   };
 })();

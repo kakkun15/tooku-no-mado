@@ -196,6 +196,9 @@
   .prow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
   .prow > span:first-child { color: var(--dim); min-width: 4.5em; }
   .prow small { color: var(--dim); font-size: 12px; }
+  .vols { margin: 0 0 6px; }
+  .vols .prow:first-child { border-top: 0; }
+  .vols input[type=range] { flex: 1; min-width: 120px; max-width: 260px; }
   .prow .sw { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); margin-left: auto; }
   .seg.left { justify-content: flex-start; }
   #psMode { margin: 2px 0 8px; } #psMode button { padding: 7px 14px; font-size: 13.5px; }
@@ -274,6 +277,7 @@
 <div id="popScene" class="pop" aria-label="景色">
   <div class="ph"><b>景色</b><span id="psNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
   <p class="lock" id="psLock">部屋のホストの景色に合わせています。景色はホストが選びます</p>
+  <div class="prow" style="border-top:0"><span>眺め方</span><div class="seg left" data-pref="frame" data-opts="none:そのまま,window:窓,tv:テレビ,pc:パソコン"></div></div>
   <div class="ctl">
     <div class="seg left" id="psMode"><button data-mode="auto">いろいろ巡る</button><button data-mode="stay">この景色のまま</button></div>
     <div class="prow" id="psInt"><span>替わる間隔</span><div class="seg left" data-pref="interval" data-opts="5:5分,10:10分,20:20分,30:30分"></div><small id="psLeft"></small></div>
@@ -286,6 +290,10 @@
 <div id="popMusic" class="pop" aria-label="音楽">
   <div class="ph"><b>音楽</b><span id="pmNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
   <p class="lock" id="pmLock">部屋のホストと同じ曲を、同じところから流しています。曲はホストが選びます（一時停止はできます）</p>
+  <div class="vols">
+    <label class="prow"><span>曲の音量</span><input type="range" min="0" max="100" data-range="vol"></label>
+    <label class="prow"><span>環境音</span><input type="range" min="0" max="100" data-range="amb"><small>焚き火・川・風・雨など</small></label>
+  </div>
   <div class="story" id="pmStory"></div>
   <div class="ctl" id="pmCtl">
     <div class="prow"><span>音色</span><div class="seg left" data-pref="timbre" data-opts="auto:おまかせ,soft:やさしい,box:オルゴール,chip:ファミコン"></div></div>
@@ -305,8 +313,6 @@
 
   <h3>音</h3>
   <div class="row"><div>再生のしかた<span class="help">バックグラウンドは、曲を音声ファイルにしてから流します。画面を消しても鳴り続けやすい方式です（iPhoneは未確認）</span></div><div class="seg" data-pref="mode" data-opts="normal:ふつう,bg:バックグラウンド"></div></div>
-  <div class="row"><div>曲の音量</div><input type="range" min="0" max="100" data-range="vol"></div>
-  <div class="row"><div>環境音<span class="help">焚き火・川・風・雨など</span></div><input type="range" min="0" max="100" data-range="amb"></div>
   <div class="row"><div>怖めの曲をやわらかく<span class="help">怒りの日・山の魔王の宮殿にて・トッカータとフーガなど7曲を、強弱と低音をおさえて、少しゆっくり、オルゴールかやさしい音色で流します（音の並びは変えません）</span></div><button class="switch" data-switch="calm" aria-label="怖めの曲をやわらかく"></button></div>
   <div class="row"><div>表示が必要な曲も流す<span class="help">クリエイティブ・コモンズ（CC）の曲です。録画や配信のときにオフにすると、表示のいらない曲だけが流れます</span></div><button class="switch" data-switch="cc" aria-label="表示が必要な曲も流す"></button></div>
   <div class="row stack"><div>曲の小話<span class="help">曲が流れているあいだに、その曲の歴史や逸話を出します。「くわしく」は何段落かを順に、「短く」はひとことを2つまで。見逃しても、下の音符のボタンを押せば、その曲の話を全部読めます。どれも資料で確かめたことだけで、出典つき</span></div><div class="seg" data-pref="noteLen" data-opts="long:くわしく,short:短く,off:出さない"></div></div>
@@ -404,6 +410,7 @@
 <script src="scenes-a.js"></script>
 <script src="scenes-b.js"></script>
 <script src="scenes-c.js"></script>
+<script src="frames.js"></script>
 <script src="stage.js"></script>
 <script src="avatar.js"></script>
 <script src="room.js"></script>
@@ -641,7 +648,7 @@
     const key = el.dataset.switch, sync = () => el.classList.toggle('on', !!P.get(key));
     el.onclick = () => { P.set(key, !P.get(key)); sync(); }; sync();
   });
-  document.querySelectorAll('[data-range]').forEach(el => { const key = el.dataset.range; el.value = P.get(key); el.oninput = () => P.set(key, +el.value); });
+  document.querySelectorAll('[data-range]').forEach(el => { const key = el.dataset.range; el.value = P.get(key); el.oninput = () => P.set(key, +el.value); P.on(key, v => { if (+el.value !== v) el.value = v; }); });
 
   /* ---------- 曲の一覧 ---------- */
   function renderSongs() {
