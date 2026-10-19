@@ -33,6 +33,12 @@
   const lenOf = r => effEnd(r) - r[0];
   function adjust(i, deltaMs) { const r = D.log[i]; if (!r) return; r[2] = Math.max(-(r[1] - r[0]), (r[2] || 0) + deltaMs); save(); emit(); }
   function setLen(i, ms) { const r = D.log[i]; if (!r) return; r[2] = Math.max(0, ms) - (r[1] - r[0]); save(); emit(); }
+  // 押し忘れた分を足す。がんばり中なら始まりを早め、止まっているなら今終わった記録として足す（4つ目の印 1＝あとから足した）
+  function add(ms) {
+    ms = Math.max(0, Math.min(ms, 24 * 3600 * 1000)); if (!ms) return;
+    if (running()) D.run -= ms; else { const now = Date.now(); D.log.push([now - ms, now, 0, 1]); }
+    save(); emit();
+  }
   function reset(i) { const r = D.log[i]; if (!r) return; r[2] = 0; save(); emit(); }
 
   /* 日ごとの合計（日付の区切りは朝4時）。日をまたいだ回は、それぞれの日に分ける */
@@ -49,7 +55,7 @@
   const total = () => Object.values(days()).reduce((a, b) => a + b, 0);
   const first = () => { let m = D.run || Infinity; for (const r of D.log) m = Math.min(m, r[0]); return isFinite(m) ? m : null; };
   // 新しい順に、最近の記録（直すため）
-  function recent(n) { const out = []; for (let i = D.log.length - 1; i >= 0 && out.length < n; i--) out.push({ i, s: D.log[i][0], e: D.log[i][1], adj: D.log[i][2] || 0, len: lenOf(D.log[i]) }); return out; }
+  function recent(n) { const out = []; for (let i = D.log.length - 1; i >= 0 && out.length < n; i--) out.push({ i, s: D.log[i][0], e: D.log[i][1], adj: D.log[i][2] || 0, len: lenOf(D.log[i]), added: !!D.log[i][3] }); return out; }
 
   /* 表示用：1時間23分・23分・45秒 */
   function fmt(ms, withSec) {
@@ -59,6 +65,8 @@
   }
   // 直すときの目安（押すとその分だけ減らす）
   const PRESETS = [['寝落ち', -5 * 60], ['ゲーム', -60], ['昼寝', -30], ['ちょっと休憩', -10]];
+  // 押し忘れたときに足す目安（分）
+  const ADDS = [15, 30, 60, 120];
 
-  window.TookuGanbaru = { start, stop, running, elapsed, adjust, setLen, reset, days, today, total, first, recent, dayKey, fmt, PRESETS, DAY_START, on: f => { subs.add(f); return () => subs.delete(f); } };
+  window.TookuGanbaru = { start, stop, running, elapsed, adjust, setLen, reset, add, ADDS, days, today, total, first, recent, dayKey, fmt, PRESETS, DAY_START, on: f => { subs.add(f); return () => subs.delete(f); } };
 })();

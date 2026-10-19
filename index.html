@@ -253,6 +253,12 @@
   .gnum span { font-size: 12px; color: var(--dim); }
   .gnum b { font-weight: normal; font-size: 20px; }
   .gnum small { font-size: 12px; color: var(--dim); }
+  .gaddT { font-size: 12.5px; color: var(--dim); text-decoration: underline; text-underline-offset: 3px; padding: 0 0 8px; }
+  .gadd { display: none; padding: 2px 0 10px; }
+  .gadd.open { display: block; }
+  .gadd .seg { justify-content: flex-start; }
+  .gadd .min { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--dim); flex-wrap: wrap; }
+  .gadd .min input { width: 6em; font-size: 14px; }
   .ggrid { overflow-x: auto; padding: 8px 0 4px; border-top: 1px solid var(--line); scrollbar-width: thin; }
   .ggrid .cols { display: inline-grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); gap: 3px; }
   .ggrid i { width: 12px; height: 12px; border-radius: 2px; background: rgba(255,255,255,.07); cursor: pointer; }
@@ -345,6 +351,8 @@
 <div id="popGanba" class="pop" aria-label="がんばる">
   <div class="ph"><b>がんばる</b><span id="pgNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
   <div class="gmain"><button class="btn2 main" id="gGo">がんばる</button><div class="gnum"><span id="gLabel">今日</span><b id="gToday">0分</b><small id="gSub"></small></div></div>
+  <button class="gaddT" id="gAddT">押し忘れた分を足す</button>
+  <div class="gadd" id="gAdd"><p class="muted" id="gAddHelp" style="margin:0 0 6px"></p><div class="seg" id="gAddBtns"></div><div class="min">分で <input class="txt" type="number" inputmode="numeric" min="1" step="1" id="gAddMin" placeholder="45"> 分 <button class="btn2" id="gAddGo">足す</button></div></div>
   <div class="ggrid" id="gGrid"></div>
   <div class="glist" id="gList"></div>
   <p class="muted">がんばったかどうかは、自分で決めてください。押したまま休んでも、寝落ちしても大丈夫です。気になったら、あとから「直す」で減らせます（直さなくてもかまいません）。<br>記録はこの端末のブラウザだけに残ります。日付の区切りは朝4時です。</p>
@@ -798,6 +806,8 @@
     $('gGo').textContent = on ? 'おわる' : 'がんばる'; $('gGo').classList.toggle('stop', on);
     const days = G.days(), tk = G.dayKey(Date.now()), first = G.first();
     $('gToday').textContent = G.fmt(days[tk] || 0);
+    $('gAddHelp').textContent = on ? 'いまの回の始まりを、その分だけ早めます（実はさっきから始めていたとき）' : '今まで、その分がんばっていたことにして記録します';
+    $('gAddBtns').innerHTML = G.ADDS.map(m => `<button data-add="${m}">+${G.fmt(m * 60e3)}</button>`).join('');
     // マス目：はじめて使った日から今日まで（最初から一年分の空のマスは見せない。連続日数も出さない）
     const grid = $('gGrid');
     if (!first || G.dayKey(first) === tk) { grid.style.display = 'none'; $('gSub').textContent = ''; }
@@ -822,7 +832,7 @@
     const rec = G.recent(8);
     $('gList').innerHTML = rec.length ? '<h5>最近の記録</h5>' + rec.map(r => {
       const d = new Date(r.s);
-      const fixed = r.adj ? `<small>直した ${r.adj > 0 ? '+' : '−'}${G.fmt(Math.abs(r.adj))}</small>` : '';
+      const fixed = (r.added ? '<small>あとから足した</small>' : '') + (r.adj ? `<small>直した ${r.adj > 0 ? '+' : '−'}${G.fmt(Math.abs(r.adj))}</small>` : '');
       return `<div class="grec"><span class="when">${md(r.s)}（${WD[d.getDay()]}） ${hm(r.s)}〜${hm(r.e)}</span><span class="len">${G.fmt(r.len)}${fixed}</span><button class="fix" data-fix="${r.i}">直す</button></div>
         <div class="gfix${gOpen === r.i ? ' open' : ''}" data-for="${r.i}">
           <div class="seg">${G.PRESETS.map(([n, m]) => `<button data-adj="${m}" data-i="${r.i}">${n}<small>−${G.fmt(-m * 60e3)}</small></button>`).join('')}</div>
@@ -836,6 +846,11 @@
     else { G.start(); toast('がんばりはじめました。押したまま休んでも大丈夫です'); }
     renderGanba();
   };
+  const gAdd = min => { const on = G.running(); G.add(min * 60e3); toast(on ? 'いまの回の始まりを ' + G.fmt(min * 60e3) + ' 早めました' : G.fmt(min * 60e3) + ' を足しました'); $('gAdd').classList.remove('open'); $('gAddMin').value = ''; renderGanba(); };
+  $('gAddT').onclick = () => $('gAdd').classList.toggle('open');
+  $('gAddBtns').addEventListener('click', e => { const b = e.target.closest('[data-add]'); if (b) gAdd(+b.dataset.add); });
+  $('gAddGo').onclick = () => { const v = Math.round(+$('gAddMin').value); if (v > 0) gAdd(Math.min(v, 1440)); };
+  $('gAddMin').addEventListener('keydown', e => { if (e.key === 'Enter') $('gAddGo').click(); });
   $('gGrid').addEventListener('click', e => { const c = e.target.closest('i[data-k]'); if (!c || c.classList.contains('none')) return; const [y, m, d] = c.dataset.k.split('-').map(Number); $('gPick').textContent = `${m}/${d}（${WD[new Date(y, m - 1, d).getDay()]}）　${G.fmt(+c.dataset.v)}`; });
   $('gList').addEventListener('click', e => {
     const f = e.target.closest('[data-fix]'); if (f) { const i = +f.dataset.fix; gOpen = gOpen === i ? -1 : i; renderGanba(); return; }
