@@ -1,5 +1,7 @@
 # とおくの窓
 
+**▶ ここから開く：<https://kakkun15.github.io/tooku-no-mado/>**
+
 ドット絵の景色を眺めながら、著作権の切れた曲をずっと流し続けるWebページです。
 [終末ニュース](https://github.com/kakkun15/shuumatsu-news) の派生で、こちらは怖がらせる側ではなく、落ち着く側の窓です。
 
