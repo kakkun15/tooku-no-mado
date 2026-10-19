@@ -26,11 +26,15 @@
       on: !!a.on, name: String(a.name || '').replace(/[\u0000-\u001f]/g, '').slice(0, 12),
       hair: int(a.hair, HAIR_NAME.length), hc: int(a.hc, PAL.hair.length), skin: int(a.skin, PAL.skin.length), cloth: int(a.cloth, PAL.cloth.length),
       size: a.size === undefined ? 1 : int(a.size, 3, 1), face: int(a.face, 2),
-      act: ACTS[a.act] ? a.act : 'pc', x: num(a.x), y: num(a.y)
+      act: ACTS[a.act] ? a.act : 'pc', x: num(a.x), y: num(a.y),
+      gb: Number.isFinite(+a.gb) && +a.gb > 0 ? Math.min(Math.floor(+a.gb), 30 * 86400) : 0     // がんばり中なら、その経過秒
     };
   }
   const mine = () => sanitize(Object.assign({}, DEF, P.get('av') || {}));
   const setMine = patch => P.set('av', Object.assign(mine(), patch));
+  // ほかの人に送る形：がんばり中なら経過秒をつける（設定には保存しない）
+  const G = () => window.TookuGanbaru;
+  const mineNet = () => Object.assign(mine(), { gb: G() && G().running() ? Math.floor(G().elapsed() / 1000) + 1 : 0 });     // 押した直後も 0 にならないよう +1
 
   /* ---------- 絵 ---------- */
   // h:髪 s:肌 e:目 c:服 d:服の影 p:ズボン b:靴
@@ -168,12 +172,18 @@
   function setPerson(id, a) {
     let p = people.get(id); if (!p) { p = { a: null, bub: '', bubUntil: 0, el: null, seed: (Math.random() * 100) | 0, wface: 0 }; people.set(id, p); }
     p.a = sanitize(a);
+    if (id !== 'me') {           // 届いた経過秒から、がんばりの始まりを出しておく（数秒のずれは気にしない）
+      const st = p.a.gb ? Date.now() - p.a.gb * 1000 : 0;
+      if (!st) p.gbStart = 0; else if (!p.gbStart || Math.abs(p.gbStart - st) > 5000) p.gbStart = st;
+    }
   }
+  // 部屋のホストが、あとから来た人へ配るとき用（経過秒を今の時点に合わせる）
+  function netOf(id) { const p = people.get(id); if (!p || !p.a) return null; return Object.assign({}, p.a, { gb: p.gbStart ? Math.floor((Date.now() - p.gbStart) / 1000) + 1 : 0 }); }
   function removePerson(id) { const p = people.get(id); if (p && p.el) p.el.remove(); people.delete(id); }
   function say(id, text) { const p = people.get(id); if (!p) return; p.bub = text; p.bubUntil = performance.now() + 6000 + text.length * 120; }
   function domFor(p) {
     if (!layer) layer = document.getElementById('people');
-    if (!p.el) { p.el = document.createElement('div'); p.el.className = 'person'; p.el.innerHTML = '<div class="bub"></div><div class="nm"></div>'; layer.appendChild(p.el); }
+    if (!p.el) { p.el = document.createElement('div'); p.el.className = 'person'; p.el.innerHTML = '<div class="bub"></div><div class="gb"></div><div class="nm"></div>'; layer.appendChild(p.el); }
     return p.el;
   }
   const WALK = 14;               // 歩く速さ（ドット／秒）
@@ -210,12 +220,15 @@
       p.box = { x0: (fx - r.w / 2 - 1) * sc, x1: (fx + r.w / 2 + 1) * sc, y0: (r.top - 1) * sc, y1: (fy + 2) * sc };
       const el = domFor(p);
       const bub = now < p.bubUntil ? p.bub : '';
-      const key = [Math.round(fx * sc), Math.round(r.top * sc), p.a.name, bub, id === 'me'].join('|');
+      const gms = id === 'me' ? (G() && G().running() ? G().elapsed() : 0) : p.gbStart ? Date.now() - p.gbStart : 0;
+      const gb = gms ? 'がんばり中 ' + G().fmt(gms) : '';
+      const key = [Math.round(fx * sc), Math.round(r.top * sc), p.a.name, bub, gb, id === 'me'].join('|');
       if (key !== p.key) {
         p.key = key; el.style.display = '';
         el.style.left = Math.round(fx * sc) + 'px'; el.style.top = Math.round(r.top * sc) + 'px';
         el.querySelector('.nm').textContent = p.a.name || (id === 'me' ? 'あなた' : 'ななし');
         const b = el.querySelector('.bub'); b.textContent = bub; b.style.display = bub ? '' : 'none';
+        const g = el.querySelector('.gb'); g.textContent = gb; g.style.display = gb ? '' : 'none';
         el.classList.toggle('me', id === 'me');
       }
     }
@@ -274,5 +287,5 @@
     f(x, y);
   }, true);
 
-  window.TookuAvatar = { PAL, HAIR_NAME, SIZE_NAME, FACE_NAME, ACTS, DEF, sanitize, mine, setMine, setPerson, removePerson, say, preview, pick, isMine, get picking() { return !!picking; }, get dragging() { return !!drag; } };
+  window.TookuAvatar = { PAL, HAIR_NAME, SIZE_NAME, FACE_NAME, ACTS, DEF, sanitize, mine, mineNet, netOf, setMine, setPerson, removePerson, say, preview, pick, isMine, get picking() { return !!picking; }, get dragging() { return !!drag; } };
 })();

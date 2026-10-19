@@ -85,7 +85,7 @@
     if (d.t === 'hello') {
       const a = AV.sanitize(d.a), isNew = !R.names.has(id);
       R.names.set(id, a); AV.setPerson(id, a);
-      const members = { [R.myId]: AV.mine() }; for (const [k, v] of R.names) members[k] = v;
+      const members = { [R.myId]: AV.mineNet() }; for (const [k, v] of R.names) members[k] = AV.netOf(k) || v;
       send(conn, { t: 'welcome', you: id, host: R.myId, members, scene: ST.snapshot(), music: PL.syncState() });
       toAll({ t: 'me', id, a }, id);
       if (isNew) addLog(id, nameOf(id) + ' さんが来ました', true);
@@ -122,7 +122,7 @@
       peer.on('open', () => {
         const conn = peer.connect(PREFIX + code, { reliable: true });
         conn.on('open', () => {
-          send(conn, { t: 'hello', a: AV.mine() });
+          send(conn, { t: 'hello', a: AV.mineNet() });
         });
         conn.on('data', d => {
           if (d && d.t === 'full') { clearTimeout(timer); fail({ type: 'full' }); return; }
@@ -188,9 +188,11 @@
   let meT = 0, meAt = 0;
   function sendMe() {
     meT = 0; meAt = performance.now();
-    const a = AV.mine();
+    const a = AV.mineNet();
     if (R.role === 'host') toAll({ t: 'me', id: R.myId, a }); else send(R.host, { t: 'me', a });
   }
+  // がんばるを押した・終えたときも伝える（経過時間は受け取った側で数える）
+  if (window.TookuGanbaru) window.TookuGanbaru.on(() => { if (R.role && !meT) meT = setTimeout(sendMe, 150); });
   P.on('av', () => {
     if (!R.role || meT) return;
     const wait = Math.max(0, 150 - (performance.now() - meAt));

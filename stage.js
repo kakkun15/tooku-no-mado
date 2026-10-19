@@ -9,6 +9,10 @@
   let view, vctx, vg, W = 0, H = 0, VW = 0, VH = 0, FR = { x: 0, y: 0, w: 0, h: 0 }, scale = 1;
   const scC = document.createElement('canvas');
   const frameKind = () => (window.TookuFrame && P.get('frame')) || 'none';
+  const isTrain = () => frameKind() === 'train';
+  // 電車の窓：景色を窓の1.5倍の幅で描き、見える範囲を「替わる間隔」かけて右へずらす。端まで来たらトンネル
+  const TRAIN_WIDE = 1.5, TUN = { in: 1.4, mid: 3.6, out: 1.4 };
+  let tunnel = null;   // { t0, fn, done }：まっ暗になったところで fn（景色の切り替え）を呼ぶ
   const skyC = document.createElement('canvas'), stC = document.createElement('canvas');
   let cur = null, last = 0, tStart = performance.now() / 1000, running = true, trans = null;
   const listeners = new Set(), overlays = [];
@@ -47,7 +51,10 @@
     if (nW !== VW || nH !== VH || !vctx) { VW = nW; VH = nH; view.width = VW; view.height = VH; vctx = view.getContext('2d'); vctx.imageSmoothingEnabled = false; }
     const k = frameKind();
     FR = k === 'none' ? { x: 0, y: 0, w: VW, h: VH } : window.TookuFrame.layout(k, VW, VH);
-    if (FR.w !== W || FR.h !== H || !vg) { W = FR.w; H = FR.h; scC.width = W; scC.height = H; vg = scC.getContext('2d'); vg.imageSmoothingEnabled = false; trans = null; if (cur) enter(cur.def, cur.weatherKey, 'seed'); }
+    // 電車は景色を窓より広く（横 1.5 倍）、上下も揺れの分だけ 2 ドット広く描く
+    const nWs = k === 'train' ? Math.round(FR.w * TRAIN_WIDE) : FR.w, nHs = k === 'train' ? FR.h + 2 : FR.h;
+    if (k !== 'train') tunnel = null;
+    if (nWs !== W || nHs !== H || !vg) { W = nWs; H = nHs; scC.width = W; scC.height = H; vg = scC.getContext('2d'); vg.imageSmoothingEnabled = false; trans = null; if (cur) enter(cur.def, cur.weatherKey, 'seed'); }
   }
 
   /* ---------- 時刻と天気 ---------- */
@@ -161,9 +168,39 @@
     const VT = E.tools(vctx), k = frameKind();
     vctx.globalCompositeOperation = 'source-over'; vctx.globalAlpha = 1;
     if (k !== 'none') vctx.clearRect(0, 0, VW, VH);
-    vctx.drawImage(scC, FR.x, FR.y);
+    if (k === 'train') {
+      const tun = trainStep(ts);
+      // ごとん、ごとん：ときどき1ドットだけ揺れる
+      const q = t % 5.3, bob = (q < 0.12 || (q > 0.36 && q < 0.48)) ? 1 : 0;
+      vctx.drawImage(scC, Math.round(trainProgress() * (W - FR.w)), 1 - bob, FR.w, FR.h, FR.x, FR.y, FR.w, FR.h);
+      window.TookuFrame.trainFx(VT, FR, t, env, tun);
+    } else vctx.drawImage(scC, FR.x, FR.y);
     if (k !== 'none') { const fr = window.TookuFrame.draw(k, VW, VH, FR, env); vctx.drawImage(fr.cv, 0, 0); window.TookuFrame.live(VT, fr.info, t); }
     for (const f of overlays) { try { f(VT, env, t, dt); } catch (e) { console.warn(e); } }
+  }
+  /* ---------- 電車 ---------- */
+  function trainProgress() { const min = +P.get('interval') || 10; return Math.min(1, Math.max(0, (Date.now() - sceneStart) / (min * 60000))); }
+  // トンネルの進み具合。端まで来たら次の景色へ（「この景色のまま」や部屋のゲストは、同じ景色の頭に戻る）
+  function trainStep(ts) {
+    if (!tunnel && trainProgress() >= 1) {
+      if (!forced && P.get('scene') === 'auto' && !Q.get('scene')) next(); else swap(() => { sceneStart = Date.now(); });
+    }
+    if (!tunnel) return null;
+    const e = ts - tunnel.t0;
+    if (e >= TUN.in && !tunnel.done) { tunnel.done = true; try { tunnel.fn(); } catch (x) { console.warn(x); } }
+    if (e >= TUN.in + TUN.mid + TUN.out) { tunnel = null; return null; }
+    if (e < TUN.in) return { phase: 'in', p: e / TUN.in, time: e };
+    if (e < TUN.in + TUN.mid) return { phase: 'mid', p: (e - TUN.in) / TUN.mid, time: e };
+    return { phase: 'out', p: (e - TUN.in - TUN.mid) / TUN.out, time: e };
+  }
+  // 景色を替える：電車ならトンネルの中で、ほかはドットがぱらぱら入れ替わる
+  function swap(fn) {
+    if (isTrain() && cur && vg) {
+      if (tunnel && !tunnel.done) { tunnel.fn = fn; return; }
+      tunnel = { t0: last || performance.now() / 1000, fn, done: false }; return;
+    }
+    if (cur && vg) trans = { img: vg.getImageData(0, 0, W, H), t0: performance.now() / 1000, w: W, h: H };
+    fn();
   }
   // ドットがぱらぱら入れ替わる切り替え
   function drawTrans(ts) {
@@ -184,9 +221,8 @@
   }
   function go(id, opt) {
     const def = A.SCENES.find(d => d.id === id) || A.SCENES[0];
-    if (cur && vg && !(opt && opt.instant)) trans = { img: vg.getImageData(0, 0, W, H), t0: performance.now() / 1000, w: W, h: H };
-    enter(def, chooseWeather(def), false);
-    sceneStart = Date.now();
+    const doIt = () => { enter(def, chooseWeather(def), false); sceneStart = Date.now(); };
+    if (opt && opt.instant) doIt(); else swap(doIt);
   }
   function next() { if (forced) return false; const pref = P.get('scene'); go(pref === 'auto' ? pickNext() : pref); return true; }
   // 景色の一覧から選んだとき（部屋でホストに合わせているときは選べない）
@@ -197,7 +233,7 @@
     clearInterval(timer);
     timer = setInterval(() => {
       const min = +P.get('interval');
-      if (forced || P.get('scene') !== 'auto' || !min || Q.get('scene')) return;
+      if (forced || P.get('scene') !== 'auto' || !min || Q.get('scene') || isTrain()) return;     // 電車は窓が端まで来たら替わる（trainStep）
       if (Date.now() - sceneStart > min * 60000) next();
     }, 5000);
   }
@@ -228,10 +264,13 @@
     const first = Q.get('scene') || (P.get('scene') !== 'auto' ? P.get('scene') : pickNext());
     go(first, { instant: true });
     schedule();
-    P.on('scene', v => { if (!forced && v !== 'auto' && (!cur || cur.def.id !== v)) go(v); sceneStart = Date.now(); });
+    // 景色を選んだら go の中で数え直す（電車はトンネルを抜けてから。先に数え直すと窓の位置が一瞬巻き戻る）
+    P.on('scene', v => { if (!forced && v !== 'auto' && (!cur || cur.def.id !== v)) go(v); else sceneStart = Date.now(); });
     P.on('weather', () => { if (cur && !forced) enter(cur.def, chooseWeather(cur.def), false); });
     P.on('tod', () => { if (cur && !forced) { cur.randHour = undefined; enter(cur.def, cur.weatherKey, true); if (P.get('tod') === 'random') enter(cur.def, cur.weatherKey, false); } });
-    P.on('interval', () => { sceneStart = Date.now(); });
+    // 間隔を変えたら数え直す。電車は窓の位置がとばないよう、進み具合を保ったまま
+    let lastMin = +P.get('interval') || 10;
+    P.on('interval', v => { const now = Date.now(), nm = +v || 10; sceneStart = isTrain() ? now - Math.min(1, (now - sceneStart) / (lastMin * 60000)) * nm * 60000 : now; lastMin = nm; });
     requestAnimationFrame(loop);
   }
   // 景色の一覧に出す小さな絵（その景色の昼・晴れを1枚だけ描く）
@@ -265,8 +304,9 @@
     const prev = forced; forced = { id: st.id, weather: st.weather, hour: +st.hour || 12, seed: st.seed | 0 };
     const def = A.SCENES.find(d => d.id === st.id);
     if (!cur || !prev || cur.def.id !== st.id || cur.weatherKey !== st.weather || cur.seed !== forced.seed) {
-      if (cur && vg) trans = { img: vg.getImageData(0, 0, W, H), t0: performance.now() / 1000, w: W, h: H };
-      enter(def, def.weather[st.weather] !== undefined ? st.weather : 'clear', false);
+      const wk = def.weather[st.weather] !== undefined ? st.weather : 'clear';
+      if (!cur) enter(def, wk, false); else swap(() => enter(def, wk, false));
+      sceneStart = Date.now();
     } else if (Math.abs(cur.hourBuilt - forced.hour) > 0.05) enter(def, cur.weatherKey, true);
   }
   function unfollow() { if (!forced) return; forced = null; sceneStart = Date.now(); if (cur) enter(cur.def, cur.weatherKey, false); }
@@ -274,6 +314,8 @@
     init, next, go, pick, remaining, thumb, info, snapshot, follow, unfollow, get following() { return !!forced; },
     addOverlay: f => overlays.push(f), on: f => { listeners.add(f); return () => listeners.delete(f); },
     setRunning: v => { running = v; },
+    // 確認用：電車の窓の進み具合を 0〜1 にする
+    _pan(p) { const min = +P.get('interval') || 10; sceneStart = Date.now() - p * min * 60000; },
     // 確認用：時間を進めて1枚描く
     _step(seconds) { running = false; let ts = (last || performance.now() / 1000); const n = Math.max(1, Math.round(seconds * 15)); for (let i = 0; i < n; i++) { ts += 1 / 15; frame(ts, true); } },
     get state() { return cur && cur.s; }, get scale() { return scale; }, get size() { return [VW, VH]; }, get frameRect() { return FR; }, get env() { return cur && cur.env; }

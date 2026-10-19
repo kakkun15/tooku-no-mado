@@ -29,6 +29,10 @@
       const [w, h] = fitAspect(VW * 0.58 - d.panel, VH * 0.48, 4 / 3), total = w + d.b * 2 + d.panel + d.dx;
       return R((VW - total) / 2 + d.b, Math.max(16, VH * 0.2), w, h);
     }
+    if (kind === 'train') {     // 電車の窓。景色はこの四角より広く描いて、見える範囲を少しずつずらす（stage.js）
+      if (port) return R(VW * 0.07, VH * 0.2, VW * 0.86, VH * 0.36);
+      return R(VW * 0.09, Math.max(18, VH * 0.17), VW * 0.82, VH * 0.52);
+    }
     if (kind === 'pc') {
       if (port) { const [w, h] = fitAspect(VW * 0.86, VH * 0.4, 16 / 9); return R((VW - w) / 2, VH * 0.36, w, h); }
       const [w, h] = fitAspect(VW * 0.84, VH * 0.56, 16 / 9);
@@ -336,6 +340,125 @@
     return { mug: m };
   }
 
+  /* ---------- 電車（ロングシートの向かいの窓） ---------- */
+  function drawTrain(T, c, VW, VH, F, env, port) {
+    const fw = 3, top = F.y - fw, bot = F.y + F.h + fw;
+    // 壁：窓まわりはクリーム色、腰から下はうすい緑
+    T.R(0, 0, VW, VH, c('#e6e0cc'));
+    const waist = bot + 4;
+    T.R(0, waist, VW, VH - waist, c('#c9d4c8')); T.H(0, waist, VW, c('#aeb8ac'));
+    // 天井と、つり革のパイプ
+    const ceil = Math.max(3, Math.round(top * 0.16));
+    T.R(0, 0, VW, ceil, c('#f2efe4')); T.H(0, ceil, VW, c('#c8c2b0'));
+    const pipeY = ceil + 2; T.H(0, pipeY, VW, c('#9aa2aa')); T.H(0, pipeY + 1, VW, c('#6e767e'));
+    // 網棚（窓の上）。上の余白が狭い画面では、つり革だけにする
+    const roomy = top - pipeY >= 22;
+    const rackY = roomy ? Math.max(pipeY + 6, top - Math.max(6, Math.round(top * 0.28))) : top - 3;
+    if (roomy) {
+      T.H(0, rackY, VW, c('#8a929a')); T.H(0, rackY + 1, VW, c('#b8c0c8'));
+      for (let x = 1; x < VW; x += 3) T.P(x, rackY + 2, c('#a0a8b0'));
+      T.H(0, rackY + 3, VW, c('#8a929a'));
+      for (let x = 6; x < VW; x += 26) { T.line(x, rackY + 3, x + 3, rackY + 7, c('#7a828a')); }
+      // 網棚の上の荷物（かたよらせて2つだけ）
+      T.R(Math.round(VW * 0.18), rackY - 4, 9, 4, c('#6a7a9a')); T.H(Math.round(VW * 0.18), rackY - 4, 9, c('#8090b0'));
+      T.R(Math.round(VW * 0.66), rackY - 3, 6, 3, c('#b07a4a')); T.H(Math.round(VW * 0.66), rackY - 3, 6, c('#c8925e'));
+    }
+    // つり革（間をそろえすぎない）
+    const strapLen = Math.max(6, Math.min(16, top - pipeY - 3));     // 網棚の手前に垂らす
+    for (let i = 0, x = 7; x < VW - 4; i++, x += 15 + (i % 3)) {
+      const sway = (i % 2) ? 1 : 0;
+      T.V(x, pipeY + 2, strapLen - 4, c('#e8e4d8')); T.V(x + 1, pipeY + 2, strapLen - 4, c('#c8c2b0'));
+      const ry = pipeY + strapLen - 2;
+      T.R(x - 1 + sway, ry, 4, 4, c('#f0ece0')); T.R(x + sway, ry + 1, 2, 2, c('#e6e0cc'));
+      T.P(x - 1 + sway, ry, c('#d8d2c2'));
+    }
+    // 窓枠（アルミ）と窓台
+    T.R(F.x - fw, top, F.w + fw * 2, F.h + fw * 2, c('#b8bec4'));
+    T.H(F.x - fw, top, F.w + fw * 2, c('#d8dde2')); T.H(F.x - fw, bot - 1, F.w + fw * 2, c('#8a9096'));
+    T.R(F.x - fw - 2, bot, F.w + fw * 2 + 4, 3, c('#a8aeb4')); T.H(F.x - fw - 2, bot, F.w + fw * 2 + 4, c('#d0d6dc'));
+    T.g.clearRect(F.x, F.y, F.w, F.h);
+    // 窓の仕切り（真ん中からずらす）と、左の窓の上だけ開く窓の桟
+    const mx = F.x + Math.round(F.w * 0.6);
+    T.R(mx - 2, F.y, 4, F.h, c('#b8bec4')); T.V(mx - 2, F.y, F.h, c('#d8dde2')); T.V(mx + 1, F.y, F.h, c('#8a9096'));
+    const sy = F.y + Math.round(F.h * 0.3);
+    T.R(F.x, sy - 1, mx - 2 - F.x, 2, c('#b8bec4')); T.H(F.x, sy - 1, mx - 2 - F.x, c('#d8dde2'));
+    // 角を丸く
+    const rad = 3;
+    for (const [x0, x1] of [[F.x, mx - 2], [mx + 2, F.x + F.w]]) for (let y = 0; y < rad; y++) for (let x = 0; x < rad; x++) if ((rad - x - 0.5) ** 2 + (rad - y - 0.5) ** 2 > rad * rad) {
+      const col = c('#b8bec4'); T.P(x0 + x, F.y + y, col); T.P(x1 - 1 - x, F.y + y, col); T.P(x0 + x, F.y + F.h - 1 - y, col); T.P(x1 - 1 - x, F.y + F.h - 1 - y, col);
+    }
+    // ガラスの映り込み（夜は車内が映って少し白っぽく）
+    for (let k = 0; k < F.h * 0.5; k++) { const x = F.x + 5 + Math.round(k * 0.7); if (x < mx - 4) { T.P(x, F.y + 2 + k, 'rgba(255,255,255,0.07)'); T.P(x + 2, F.y + 2 + k, 'rgba(255,255,255,0.05)'); } }
+    if (env.night > 0.3) T.R(F.x, F.y, F.w, F.h, `rgba(220,230,240,${(0.07 * env.night).toFixed(3)})`);
+    if (env.weather === 'rain') {      // 走っている電車の窓：雨つぶは風で斜め後ろ（左下）へ流れる
+      const r = E.RNG(F.w * 5 + F.h);
+      for (let i = 0; i < F.w * F.h / 90; i++) {
+        const x = F.x + 2 + (r() * (F.w - 4) | 0), y = F.y + 1 + (r() * (F.h - 6) | 0), n = 2 + (r() * 4 | 0);
+        for (let k = 0; k < n; k++) T.P(x - Math.round(k * 1.6), y + k, `rgba(255,255,255,${k ? 0.14 : 0.4})`);
+      }
+    }
+    // ロングシート（背もたれと座面）
+    const backTop = waist + Math.max(3, Math.round((VH - waist) * (port ? 0.12 : 0.1))), seatY = Math.round(backTop + (VH - backTop) * (port ? 0.42 : 0.5)), seatH = Math.max(5, Math.round((VH - seatY) * (port ? 0.3 : 0.42)));
+    T.R(0, backTop, VW, seatY - backTop, c('#3d6670')); T.H(0, backTop, VW, c('#55808a'));
+    for (let y = backTop + 2; y < seatY - 1; y += 3) for (let x = (y % 2) * 2; x < VW; x += 4) T.P(x, y, c('#355a63'));
+    for (let x = Math.round(VW * 0.13); x < VW; x += Math.round(VW * 0.29)) T.V(x, backTop + 1, seatY - backTop - 1, c('#2f5058'));     // 座席の区切りの縫い目
+    T.R(0, seatY, VW, seatH, c('#4a7680')); T.H(0, seatY, VW, c('#6a98a2')); T.H(0, seatY + seatH - 1, VW, c('#2e4c54'));
+    for (let y = seatY + 2; y < seatY + seatH - 1; y += 3) for (let x = (y % 2) * 2 + 1; x < VW; x += 4) T.P(x, y, c('#426c76'));
+    // 座席の下と床
+    const fy = seatY + seatH;
+    T.R(0, fy, VW, VH - fy, c('#5a5e62')); T.R(0, fy, VW, Math.min(3, VH - fy), c('#3e4246'));
+    for (let x = 4; x < VW; x += 9) T.V(x, fy + 1, Math.min(2, VH - fy - 1), c('#6e7276'));       // 暖房のすき間
+    // 縦長は床が広いので、床の継ぎ目と、だれかの紙袋
+    if (port && VH - fy > 20) {
+      for (let y = fy + 8; y < VH; y += 9) T.H(0, y, VW, c('#64686c'));
+      const bx = Math.round(VW * 0.24), by = fy + Math.round((VH - fy) * 0.45);
+      T.R(bx, by - 9, 10, 9, c('#c8a878')); T.H(bx, by - 9, 10, c('#d8bc8c')); T.V(bx + 9, by - 9, 9, c('#a88a5c'));
+      T.line(bx + 2, by - 9, bx + 3, by - 12, c('#8a6a40')); T.line(bx + 7, by - 9, bx + 6, by - 12, c('#8a6a40')); T.H(bx + 3, by - 12, 4, c('#8a6a40'));
+      T.ellipse(bx + 5, by + 1, 6, 1, c('#000000', 0.18));
+    }
+    // 手すり（座席の端に1本だけ）
+    const hx = Math.round(VW * (port ? 0.86 : 0.93));
+    T.R(hx, rackY + 4, 2, fy - rackY - 4, c('#c8ced4')); T.V(hx, rackY + 4, fy - rackY - 4, c('#e8ecf0'));
+    // 手すりに立てかけた傘
+    const uy = fy - 1, ux = hx - 3;
+    T.line(ux, uy, ux + 3, uy - 22, c('#2e4a6a')); T.line(ux - 1, uy, ux + 2, uy - 20, c('#3a5a80')); T.line(ux + 1, uy - 2, ux + 3, uy - 19, c('#24405e'));
+    T.R(ux + 2, uy - 25, 2, 3, c('#6a4a30')); T.P(ux + 1, uy - 25, c('#6a4a30'));
+    // 窓の下の置き物：だれかの忘れた缶（左の窓の下）
+    const can = F.x + Math.round(F.w * 0.22);
+    T.R(can, bot - 4, 3, 4, c('#c84a3a')); T.H(can, bot - 4, 3, c('#e0e4e8')); T.P(can + 1, bot - 2, c('#f0e0c0'));
+    return { train: F, mx, sy };
+  }
+
+  /* 電車の窓の中で動くもの：通り過ぎる電柱、トンネル。景色の上・窓枠の下に描く */
+  function trainFx(T, F, t, env, tun) {
+    const g = T.g; g.save(); g.beginPath(); g.rect(F.x, F.y, F.w, F.h); g.clip();
+    if (!tun) {
+      // 電柱：8〜13秒にひとつ、右から左へ0.7秒ほどで通る
+      const per = 10.5, k = Math.floor(t / per), ph = t - k * per, start = (k * 37 % 5) * 0.6;
+      const p = (ph - start) / 0.7;
+      if (p > 0 && p < 1) {
+        const x = F.x + F.w + 6 - p * (F.w + 16), col = env.night > 0.5 ? 'rgba(18,20,26,0.92)' : 'rgba(58,54,50,0.95)';
+        T.R(x, F.y, 4, F.h, col); T.R(x - 6, F.y + Math.round(F.h * 0.12), 16, 2, col); T.R(x - 4, F.y + Math.round(F.h * 0.2), 12, 1, col);
+        T.R(x - 4, F.y + Math.round(F.h * 0.12) - 2, 1, 2, col); T.R(x + 7, F.y + Math.round(F.h * 0.12) - 2, 1, 2, col);
+      }
+    } else {
+      // トンネル：入口は右から暗くなり、中では灯りが流れ、出口は右から明るくなる
+      const dark = '#0c0e14';
+      if (tun.phase === 'in') T.R(F.x + F.w * (1 - tun.p), F.y, F.w * tun.p + 1, F.h, dark);
+      else if (tun.phase === 'out') T.R(F.x, F.y, F.w * (1 - tun.p) + 1, F.h, dark);
+      else T.R(F.x, F.y, F.w, F.h, dark);
+      if (tun.phase === 'mid') {
+        const ly = F.y + Math.round(F.h * 0.22);
+        for (let i = 0; i < 3; i++) {
+          const q = ((tun.time * 1.6 + i / 3) % 1), x = F.x + F.w + 4 - q * (F.w + 12);
+          T.R(x, ly, 5, 2, '#ffb860'); g.fillStyle = 'rgba(255,184,96,0.18)'; g.fillRect(Math.round(x) - 4, ly - 3, 13, 8);
+        }
+        T.R(F.x, F.y, F.w, F.h, 'rgba(200,215,230,0.06)');        // 車内の明かりがガラスに映る
+      }
+    }
+    g.restore();
+  }
+
   const cache = { key: '', cv: null, info: null };
   function draw(kind, VW, VH, F, env) {
     const key = [kind, VW, VH, F.x, F.y, F.w, F.h, Math.round(env.night * 20), Math.round(env.lights * 20), env.weather].join(',');
@@ -343,8 +466,10 @@
     const cv = cache.cv && cache.cv.width === VW && cache.cv.height === VH ? cache.cv : document.createElement('canvas');
     cv.width = VW; cv.height = VH;
     const g = cv.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, VW, VH);
-    const T = E.tools(g), c = lighting(env), port = VH > VW * 1.15;
-    const info = kind === 'window' ? drawWindow(T, c, VW, VH, F, env) : kind === 'tv' ? drawTV(T, c, VW, VH, F, env, port) : drawPC(T, c, VW, VH, F, env, port);
+    const T = E.tools(g), port = VH > VW * 1.15;
+    // 電車は夜も車内の明かりがついているので、部屋ほど暗くしない
+    const c = lighting(kind === 'train' ? { night: env.night * 0.3, lights: 0, weather: env.weather } : env);
+    const info = kind === 'window' ? drawWindow(T, c, VW, VH, F, env) : kind === 'tv' ? drawTV(T, c, VW, VH, F, env, port) : kind === 'train' ? drawTrain(T, c, VW, VH, F, env, port) : drawPC(T, c, VW, VH, F, env, port);
     Object.assign(cache, { key, cv, info });
     return cache;
   }
@@ -357,5 +482,5 @@
       T.P(x, y, `rgba(255,255,255,${(0.32 * (1 - p)).toFixed(2)})`);
     }
   }
-  window.TookuFrame = { layout, draw, live, KINDS: ['none', 'window', 'tv', 'pc'] };
+  window.TookuFrame = { layout, draw, live, trainFx, KINDS: ['none', 'window', 'tv', 'pc', 'train'] };
 })();

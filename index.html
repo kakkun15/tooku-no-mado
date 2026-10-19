@@ -51,7 +51,7 @@
   #bar .np { flex: 1; min-width: 0; line-height: 1.35; padding: 0 4px; }
   #bar .t { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #bar .s { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  @media (max-width: 480px) { #bar { gap: 0; padding: 6px 6px; } #bar .btn { width: 35px; height: 38px; } #bar .btn svg.px { width: 21px; height: 21px; } #bar .np { padding: 0 3px; } }
+  @media (max-width: 480px) { #bar { gap: 0; padding: 6px 6px; } #bar .btn { width: 33px; height: 38px; } #bar .btn svg.px { width: 21px; height: 21px; } #bar .np { padding: 0 3px; } }
   #prog { height: 2px; background: rgba(255,255,255,.14); border-radius: 2px; margin-top: 5px; overflow: hidden; }
   #prog i { display: block; height: 100%; width: 0; background: var(--accent); }
   #where { position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); z-index: 19; font-size: 13px; color: var(--ink);
@@ -115,6 +115,7 @@
   .person { position: absolute; width: max-content; max-width: 230px; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 3px; padding-bottom: 3px; }
   .person .nm { font-size: 11px; color: var(--ink); text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.6); white-space: nowrap; }
   .person.me .nm { color: var(--accent); }
+  .person .gb { font-size: 10.5px; color: var(--accent); text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 3px rgba(0,0,0,.6); white-space: nowrap; }
   .person .bub { max-width: 220px; font-size: 12.5px; line-height: 1.45; color: #1d1a16; background: #f6f1e6; border-radius: 10px; padding: 5px 9px; box-shadow: 0 2px 6px rgba(0,0,0,.35); word-break: break-word; position: relative; }
   .person .bub::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: #f6f1e6; }
   body.picking #view { cursor: crosshair; }
@@ -238,6 +239,40 @@
   .moods button.on { color: #1d1a16; border-color: transparent; }
   .moods button small { opacity: .75; margin-left: 4px; font-size: 11px; }
   .song .info { font-size: 12px; color: var(--dim); padding: 2px 6px; flex: none; border: 1px solid var(--line); border-radius: 6px; }
+  /* がんばる */
+  #bar .s .g { color: var(--accent); font-weight: normal; margin-right: 6px; }
+  #bar .s .g:empty { display: none; }
+  #bGanba { position: relative; }
+  #bGanba.on { color: var(--accent); }
+  #bGanba.on::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: gbeat 2.4s ease-in-out infinite; }
+  @keyframes gbeat { 50% { opacity: .25; } }
+  .gmain { display: flex; align-items: center; gap: 14px; padding: 4px 0 10px; }
+  .gmain .btn2 { min-width: 7.5em; padding: 10px 16px; font-size: 15px; border-radius: 12px; }
+  .gmain .btn2.stop { background: none; color: var(--accent); border-color: var(--accent); }
+  .gnum { display: flex; flex-direction: column; line-height: 1.3; }
+  .gnum span { font-size: 12px; color: var(--dim); }
+  .gnum b { font-weight: normal; font-size: 20px; }
+  .gnum small { font-size: 12px; color: var(--dim); }
+  .ggrid { overflow-x: auto; padding: 8px 0 4px; border-top: 1px solid var(--line); scrollbar-width: thin; }
+  .ggrid .cols { display: inline-grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); gap: 3px; }
+  .ggrid i { width: 12px; height: 12px; border-radius: 2px; background: rgba(255,255,255,.07); cursor: pointer; }
+  .ggrid i.none { visibility: hidden; }
+  .ggrid i.l1 { background: rgba(255,200,112,.32); } .ggrid i.l2 { background: rgba(255,200,112,.55); } .ggrid i.l3 { background: rgba(255,200,112,.8); } .ggrid i.l4 { background: #ffc870; }
+  .ggrid i.today { outline: 1px solid rgba(255,255,255,.6); outline-offset: 1px; }
+  .ggrid .pick { font-size: 12.5px; color: var(--dim); min-height: 1.6em; padding-top: 6px; }
+  .glist { border-top: 1px solid var(--line); padding-top: 4px; }
+  .glist h5 { margin: 6px 0 2px; font-weight: normal; font-size: 12.5px; color: var(--dim); }
+  .grec { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .grec .when { flex: 1; min-width: 0; color: var(--dim); font-size: 12.5px; }
+  .grec .len { flex: none; }
+  .grec .len small { color: var(--dim); font-size: 11px; margin-left: 4px; }
+  .grec button.fix { flex: none; font-size: 12px; color: var(--accent); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+  .gfix { display: none; padding: 6px 0 10px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .gfix.open { display: block; }
+  .gfix .seg { justify-content: flex-start; }
+  .gfix .seg button small { opacity: .75; margin-left: 4px; font-size: 11px; }
+  .gfix .min { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--dim); flex-wrap: wrap; }
+  .gfix .min input { width: 6em; font-size: 14px; }
   #toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 50; padding: 8px 14px; font-size: 13px; opacity: 0; transition: opacity .4s; pointer-events: none; }
   #toast.show { opacity: 1; }
 </style>
@@ -266,7 +301,8 @@
   <button class="btn" id="bPrev" aria-label="前の曲" data-icon="prev"></button>
   <button class="btn" id="bPlay" aria-label="再生・一時停止" data-icon="play"></button>
   <button class="btn" id="bNext" aria-label="次の曲" data-icon="next"></button>
-  <div class="np"><div class="t" id="nT">準備しています…</div><div class="s" id="nS"></div><div class="l" id="nL"></div><div id="prog"><i></i></div></div>
+  <div class="np"><div class="t" id="nT">準備しています…</div><div class="s"><b class="g" id="nG"></b><span id="nS"></span></div><div class="l" id="nL"></div><div id="prog"><i></i></div></div>
+  <button class="btn" id="bGanba" aria-label="がんばる" data-icon="ganba"></button>
   <button class="btn" id="bScene" aria-label="景色を選ぶ" data-icon="scene"></button>
   <button class="btn" id="bMusic" aria-label="音楽と曲の話" data-icon="note"><i class="dot"></i></button>
   <button class="btn" id="bRoom" aria-label="みんなの窓" data-icon="people"><i class="dot"></i></button>
@@ -277,7 +313,7 @@
 <div id="popScene" class="pop" aria-label="景色">
   <div class="ph"><b>景色</b><span id="psNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
   <p class="lock" id="psLock">部屋のホストの景色に合わせています。景色はホストが選びます</p>
-  <div class="prow" style="border-top:0"><span>眺め方</span><div class="seg left" data-pref="frame" data-opts="none:そのまま,window:窓,tv:テレビ,pc:パソコン"></div></div>
+  <div class="prow" style="border-top:0"><span>眺め方</span><div class="seg left" data-pref="frame" data-opts="none:そのまま,window:窓,tv:テレビ,pc:パソコン,train:電車"></div></div>
   <div class="ctl">
     <div class="seg left" id="psMode"><button data-mode="auto">いろいろ巡る</button><button data-mode="stay">この景色のまま</button></div>
     <div class="prow" id="psInt"><span>替わる間隔</span><div class="seg left" data-pref="interval" data-opts="5:5分,10:10分,20:20分,30:30分"></div><small id="psLeft"></small></div>
@@ -304,6 +340,14 @@
     <p class="muted">チェックを外した曲は流れません。「流す」でその曲へ。</p>
     <div class="songs" id="songs"></div>
   </div>
+</div>
+<!-- がんばるのパネル -->
+<div id="popGanba" class="pop" aria-label="がんばる">
+  <div class="ph"><b>がんばる</b><span id="pgNow"></span><button class="x" data-popclose aria-label="閉じる" data-icon="close"></button></div>
+  <div class="gmain"><button class="btn2 main" id="gGo">がんばる</button><div class="gnum"><span id="gLabel">今日</span><b id="gToday">0分</b><small id="gSub"></small></div></div>
+  <div class="ggrid" id="gGrid"></div>
+  <div class="glist" id="gList"></div>
+  <p class="muted">がんばったかどうかは、自分で決めてください。押したまま休んでも、寝落ちしても大丈夫です。気になったら、あとから「直す」で減らせます（直さなくてもかまいません）。<br>記録はこの端末のブラウザだけに残ります。日付の区切りは朝4時です。</p>
 </div>
 <!-- 小話を話す小鳥 -->
 <div id="bird" aria-live="polite"><div class="bub"></div><div class="body"></div></div>
@@ -413,6 +457,7 @@
 <script src="frames.js"></script>
 <script src="stage.js"></script>
 <script src="avatar.js"></script>
+<script src="ganbaru.js"></script>
 <script src="room.js"></script>
 <script>
 (function () {
@@ -462,17 +507,19 @@
   $('bNext').onclick = () => { if (PL.following) return guestSay(); PL.skip(); };
   $('bPrev').onclick = () => { if (PL.following) return guestSay(); PL.prev(); };
   /* ---------- 景色・音楽のパネル（帯の上） ---------- */
-  const pops = { scene: $('popScene'), music: $('popMusic') };
+  const pops = { scene: $('popScene'), music: $('popMusic'), ganba: $('popGanba') };
   function openPop(k) {
     closeSheet(true);
     for (const [n, el] of Object.entries(pops)) el.classList.toggle('open', n === k && !el.classList.contains('open'));
     if (pops.scene.classList.contains('open')) renderScenePop();
     if (pops.music.classList.contains('open')) { renderMusicPop(); $('bMusic').classList.remove('unread'); }
+    if (pops.ganba.classList.contains('open')) renderGanba();
     poke();
   }
   const closePops = () => { for (const el of Object.values(pops)) el.classList.remove('open'); };
   $('bScene').onclick = () => openPop('scene');
   $('bMusic').onclick = () => openPop('music');
+  $('bGanba').onclick = () => openPop('ganba');
   document.querySelectorAll('[data-popclose]').forEach(b => b.onclick = () => { closePops(); poke(); });
   Object.values(pops).forEach(el => el.addEventListener('pointerdown', e => e.stopPropagation()));
   $('view').addEventListener('pointerdown', () => { if (!AV.picking) closePops(); });
@@ -728,6 +775,76 @@
     toast(v ? '表示が必要な曲（CC）も流します' : '表示が必要な曲（CC）は流しません'); renderSongs();
   });
   P.on('mode', v => toast(v === 'bg' ? 'バックグラウンド再生にしました（曲の用意に少し時間がかかります）' : 'ふつうの再生にしました'));
+
+  /* ---------- がんばる ---------- */
+  // 見張り・警告・自動停止はしない。押した時刻を覚えておくだけ（ganbaru.js）
+  const G = window.TookuGanbaru;
+  const WD = ['日', '月', '火', '水', '木', '金', '土'];
+  const md = ms => { const d = new Date(ms); return (d.getMonth() + 1) + '/' + d.getDate(); };
+  const hm = ms => { const d = new Date(ms); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const level = ms => ms <= 0 ? 0 : ms < 3600e3 ? 1 : ms < 7200e3 ? 2 : ms < 14400e3 ? 3 : 4;
+  let gOpen = -1;          // 直す欄を開いている記録
+  function tickGanba() {
+    const on = G.running(), el = G.elapsed();
+    $('bGanba').classList.toggle('on', on);
+    $('nG').textContent = on ? 'がんばり中 ' + G.fmt(el, true) : '';
+    if (!pops.ganba.classList.contains('open')) return;
+    $('pgNow').textContent = on ? 'がんばり中 ' + G.fmt(el, true) : '';
+    $('gToday').textContent = G.fmt(G.today());
+  }
+  setInterval(tickGanba, 1000);
+  function renderGanba() {
+    const on = G.running();
+    $('gGo').textContent = on ? 'おわる' : 'がんばる'; $('gGo').classList.toggle('stop', on);
+    const days = G.days(), tk = G.dayKey(Date.now()), first = G.first();
+    $('gToday').textContent = G.fmt(days[tk] || 0);
+    // マス目：はじめて使った日から今日まで（最初から一年分の空のマスは見せない。連続日数も出さない）
+    const grid = $('gGrid');
+    if (!first || G.dayKey(first) === tk) { grid.style.display = 'none'; $('gSub').textContent = ''; }
+    else {
+      grid.style.display = '';
+      const DAY = 864e5, base = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const startDay = new Date(first - G.DAY_START * 3600e3), end = base(new Date(Date.now() - G.DAY_START * 3600e3));
+      // はじめて使った週の日曜から。一年より長くなったら直近の53週だけ
+      const t0 = Math.max(base(startDay) - startDay.getDay() * DAY, end - new Date(end).getDay() * DAY - 52 * 7 * DAY);
+      const cells = []; let tot = 0;
+      for (let t = t0; t <= end + 3600e3; t += DAY) {
+        const d = new Date(t + 3600e3), k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const v = days[k] || 0, before = t < base(startDay);
+        cells.push(`<i class="${before ? 'none' : 'l' + level(v)}${k === tk ? ' today' : ''}" data-k="${k}" data-v="${v}" title="${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}） ${G.fmt(v)}"></i>`);
+      }
+      for (const v of Object.values(days)) tot += v;
+      grid.innerHTML = `<div class="cols">${cells.join('')}</div><div class="pick" id="gPick">マスを押すと、その日の時間が出ます</div>`;
+      grid.scrollLeft = grid.scrollWidth;
+      $('gSub').textContent = 'これまで ' + G.fmt(tot);
+    }
+    // 最近の記録（直すのは任意）
+    const rec = G.recent(8);
+    $('gList').innerHTML = rec.length ? '<h5>最近の記録</h5>' + rec.map(r => {
+      const d = new Date(r.s);
+      const fixed = r.adj ? `<small>直した ${r.adj > 0 ? '+' : '−'}${G.fmt(Math.abs(r.adj))}</small>` : '';
+      return `<div class="grec"><span class="when">${md(r.s)}（${WD[d.getDay()]}） ${hm(r.s)}〜${hm(r.e)}</span><span class="len">${G.fmt(r.len)}${fixed}</span><button class="fix" data-fix="${r.i}">直す</button></div>
+        <div class="gfix${gOpen === r.i ? ' open' : ''}" data-for="${r.i}">
+          <div class="seg">${G.PRESETS.map(([n, m]) => `<button data-adj="${m}" data-i="${r.i}">${n}<small>−${G.fmt(-m * 60e3)}</small></button>`).join('')}</div>
+          <div class="min">長さを分で直す <input class="txt" type="number" inputmode="numeric" min="0" step="1" data-min="${r.i}" value="${Math.round(r.len / 60e3)}"> 分${r.adj ? ` <button class="btn2" data-reset="${r.i}">元に戻す</button>` : ''}</div>
+        </div>`;
+    }).join('') : '';
+    tickGanba();
+  }
+  $('gGo').onclick = () => {
+    if (G.running()) { const i = G.stop(); const r = G.recent(1)[0]; toast(r && r.i === i ? 'おつかれさま。今回は ' + G.fmt(r.len) : 'おつかれさま'); }
+    else { G.start(); toast('がんばりはじめました。押したまま休んでも大丈夫です'); }
+    renderGanba();
+  };
+  $('gGrid').addEventListener('click', e => { const c = e.target.closest('i[data-k]'); if (!c || c.classList.contains('none')) return; const [y, m, d] = c.dataset.k.split('-').map(Number); $('gPick').textContent = `${m}/${d}（${WD[new Date(y, m - 1, d).getDay()]}）　${G.fmt(+c.dataset.v)}`; });
+  $('gList').addEventListener('click', e => {
+    const f = e.target.closest('[data-fix]'); if (f) { const i = +f.dataset.fix; gOpen = gOpen === i ? -1 : i; renderGanba(); return; }
+    const a = e.target.closest('[data-adj]'); if (a) { G.adjust(+a.dataset.i, +a.dataset.adj * 60e3); renderGanba(); return; }
+    const r = e.target.closest('[data-reset]'); if (r) { G.reset(+r.dataset.reset); renderGanba(); }
+  });
+  $('gList').addEventListener('change', e => { const m = e.target.closest('[data-min]'); if (m && m.value !== '' && isFinite(+m.value)) { G.setLen(+m.dataset.min, Math.max(0, Math.round(+m.value)) * 60e3); renderGanba(); } });
+  G.on(() => { tickGanba(); if (pops.ganba.classList.contains('open')) renderGanba(); });
+  tickGanba();
 
   /* ---------- みんなの窓 ---------- */
   const AV = window.TookuAvatar, RM = window.TookuRoom;
