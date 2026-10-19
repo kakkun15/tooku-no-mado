@@ -8,6 +8,11 @@
   /* 景色を描く四角（ビューのドット単位） */
   /* 景色を描く四角（ビューのドット単位）。テレビは 4:3（ブラウン管）、パソコンは 16:9 に固定して、画面の大きさに合わせて置く */
   const fitAspect = (maxW, maxH, ar) => { let w = maxW, h = w / ar; if (h > maxH) { h = maxH; w = h * ar; } return [Math.round(w), Math.round(h)]; };
+  /* テレビの寸法：b＝画面まわりの木の縁、bev＝画面へ落ちこむ傾斜、panel＝横のつまみ板（横長のとき）、
+     panelH＝下のスピーカー（縦長のとき）、dx・dy＝箱の上面と右の側面を見せる奥行き */
+  function tvDims(VW, VH, port) {
+    return { b: port ? 8 : 9, bev: 3, panel: port ? 0 : Math.max(18, Math.round(VW * 0.11)), panelH: port ? 14 : 0, dx: 5, dy: 3 };
+  }
   function layout(kind, VW, VH) {
     const port = VH > VW * 1.15, R = (x, y, w, h) => ({ x: Math.round(x), y: Math.round(y), w: Math.max(40, Math.round(w)), h: Math.max(30, Math.round(h)) });
     if (kind === 'window') {
@@ -15,12 +20,14 @@
       return R(sx, top, VW - sx * 2, VH - top - bot);
     }
     if (kind === 'tv') {
-      if (port) {        // 縦長：幅いっぱいのテレビを台に置く。下に床
-        const [w, h] = fitAspect(VW * 0.8, VH * 0.4, 4 / 3), bottom = Math.round(VH * 0.64) - 8 - 14 - 4;
-        return R((VW - w) / 2, bottom - h, w, h);
+      const d = tvDims(VW, VH, port);
+      if (port) {        // 縦長：テレビを台に置く。下に床
+        const [w, h] = fitAspect(VW * 0.7, VH * 0.34, 4 / 3), bottom = Math.round(VH * 0.64) - 8 - d.panelH - d.b;
+        return R((VW - (w + d.b * 2 + d.dx)) / 2 + d.b, bottom - h, w, h);
       }
-      const panel = Math.max(24, Math.round(VW * 0.13)), [w, h] = fitAspect(VW * 0.86 - panel, VH * 0.6, 4 / 3);
-      return R((VW - w - panel) / 2, Math.max(15, VH * 0.13), w, h);
+      // 横長：まわりに棚とライトを置くので、テレビは真ん中にやや小さく
+      const [w, h] = fitAspect(VW * 0.58 - d.panel, VH * 0.48, 4 / 3), total = w + d.b * 2 + d.panel + d.dx;
+      return R((VW - total) / 2 + d.b, Math.max(16, VH * 0.2), w, h);
     }
     if (kind === 'pc') {
       if (port) { const [w, h] = fitAspect(VW * 0.86, VH * 0.4, 16 / 9); return R((VW - w) / 2, VH * 0.36, w, h); }
@@ -114,64 +121,156 @@
     return { mug: m };
   }
 
+  /* ---------- 部屋の小物（横長の画面で両わきが空かないように） ---------- */
+  function books(T, c, x0, x1, base, seed, maxH) {
+    const cols = ['#7a8fb0', '#c8846a', '#e0c070', '#6f9a7a', '#b06a7a', '#8a7ab0', '#d8d0c0'], r = E.RNG(seed);
+    let x = x0;
+    for (let i = 0; x < x1 - 2 && i < 12; i++) { const h = Math.max(4, maxH - (r() * 4 | 0)), w = 2 + (r() * 2 | 0), col = cols[(i * 3 + seed) % cols.length]; if (x + w > x1) break; T.R(x, base - h, w, h, c(col)); T.H(x, base - h + 2, w, c('#f0e8d8', 0.5)); x += w + (r() < 0.2 ? 1 : 0); }
+    return x;
+  }
+  function clock(T, c, cx, cy) { T.circ(cx, cy, 6, c('#6a4a30')); T.circ(cx, cy, 5, c('#f2ead8')); T.line(cx, cy, cx, cy - 3, c('#2a2a2a')); T.line(cx, cy, cx + 2, cy + 1, c('#2a2a2a')); }
+  /* 壁の小さな絵（丘と太陽）。額の縁は時間帯で暗くなる */
+  function picture(T, c, x, y, w, h) {
+    T.R(x, y, w, h, c('#5a3e28')); T.H(x, y, w, c('#76563a'));
+    T.R(x + 1, y + 1, w - 2, h - 2, c('#e8e0cc'));
+    const ix = x + 2, iy = y + 2, iw = w - 4, ih = h - 4;
+    T.R(ix, iy, iw, ih, c('#a8c8dc')); T.R(ix, iy + Math.round(ih * 0.45), iw, ih - Math.round(ih * 0.45), c('#c4dae6'));
+    T.poly([[ix, iy + ih * 0.75], [ix + iw * 0.35, iy + ih * 0.42], [ix + iw * 0.62, iy + ih * 0.7], [ix + iw, iy + ih * 0.55], [ix + iw, iy + ih], [ix, iy + ih]], c('#7a9a78'));
+    T.poly([[ix, iy + ih * 0.9], [ix + iw * 0.5, iy + ih * 0.72], [ix + iw, iy + ih * 0.86], [ix + iw, iy + ih], [ix, iy + ih]], c('#5f8462'));
+    T.P(ix + Math.round(iw * 0.75), iy + 1, c('#f4e2a0')); T.P(ix + Math.round(iw * 0.75) + 1, iy + 1, c('#f4e2a0'));
+    T.P(x + Math.round(w / 2), y - 2, c('#4a3a2a')); T.line(x + 2, y, x + Math.round(w / 2), y - 2, c('#4a3a2a', 0.6)); T.line(x + w - 3, y, x + Math.round(w / 2), y - 2, c('#4a3a2a', 0.6));
+  }
+  /* 床置きの低い棚：左にレコード、右に本。上に植物と寝かせた本 */
+  function lowShelf(T, c, x, base, w, h, seed) {
+    const top = base - h;
+    T.R(x, top, w, h, c('#7a5436')); T.R(x - 1, top, w + 2, 2, c('#93684a')); T.H(x - 1, top, w + 2, c('#a87a54'));
+    T.H(x, base - 1, w, c('#5a3c26'));
+    const mid = x + Math.round(w * 0.48), cy = top + 3, ch = h - 5;
+    T.R(x + 2, cy, mid - x - 3, ch, c('#4a3020')); T.R(mid + 1, cy, x + w - mid - 3, ch, c('#4a3020'));
+    const rec = ['#2a2a2e', '#c8846a', '#2a2a2e', '#3a4a6a', '#e0c070', '#2a2a2e'];
+    for (let xx = x + 2, i = 0; xx < mid - 1; xx++, i++) T.V(xx, cy + 1, ch - 1, c(rec[i % rec.length]));
+    books(T, c, mid + 2, x + w - 2, cy + ch, seed, ch - 1);
+    plant(T, c, x + Math.round(w * 0.74), top);
+    T.R(x + 3, top - 2, 8, 2, c('#b06a7a')); T.R(x + 4, top - 4, 7, 2, c('#7a8fb0')); T.H(x + 4, top - 4, 7, c('#9aaed0'));
+  }
+  /* 立てるライト：夕方と夜は灯る */
+  function floorLamp(T, c, x, base, top, env) {
+    const on = env.lights > 0.25;
+    if (on) { const g = T.g, gr = g.createRadialGradient(x, top + 4, 2, x, top + 4, 30); gr.addColorStop(0, `rgba(255,200,120,${(0.35 * env.lights).toFixed(3)})`); gr.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = gr; g.fillRect(x - 30, top - 26, 60, 60); }
+    T.ellipse(x, base, 4, 1, c('#3a3030')); T.V(x, top + 7, base - top - 7, c('#4a4040')); T.V(x + 1, top + 7, base - top - 7, c('#2e2828'));
+    T.poly([[x - 3, top], [x + 4, top], [x + 7, top + 7], [x - 6, top + 7]], on ? '#f6dc9c' : c('#e6d6b4'));
+    T.H(x - 6, top + 7, 14, on ? '#e0b870' : c('#c8b48e')); T.H(x - 3, top, 7, on ? '#fff0c8' : c('#f0e4c8'));
+    if (on) for (let k = 1; k < 5; k++) T.H(x - 5 - Math.round(k * 0.6), top + 7 + k, 12 + Math.round(k * 1.2), `rgba(255,220,150,${(0.16 * (5 - k) / 4 * env.lights).toFixed(3)})`);
+  }
+  /* 壁のコルクボード（メモと写真） */
+  function corkboard(T, c, x, y, w, h) {
+    T.R(x, y, w, h, c('#8a6040')); T.R(x + 1, y + 1, w - 2, h - 2, c('#c89a62'));
+    for (let i = 0; i < w * h / 8; i++) { const px = x + 1 + ((i * 7) % (w - 2)), py = y + 1 + ((i * 11) % (h - 2)); T.P(px, py, c('#b5864f')); }
+    const note = (nx, ny, nw, nh, col) => { if (nx + nw > x + w - 1 || ny + nh > y + h - 1) return; T.R(nx, ny, nw, nh, c(col)); T.H(nx + 1, ny + 2, nw - 2, c('#000000', 0.12)); T.P(nx + Math.round(nw / 2), ny, c('#c8463a')); };
+    note(x + 2, y + 2, 6, 5, '#f2e6a0'); note(x + Math.round(w * 0.55), y + 3, 5, 5, '#f0b8b0'); note(x + 3, y + Math.round(h * 0.55), 5, 4, '#b8d8f0');
+    const px = x + Math.round(w * 0.45), py = y + Math.round(h * 0.5);       // 写真
+    if (px + 7 < x + w && py + 6 < y + h) { T.R(px, py, 7, 6, c('#f4f0e8')); T.R(px + 1, py + 1, 5, 2, c('#9ec0dc')); T.R(px + 1, py + 3, 5, 2, c('#7aa070')); T.P(px + 3, py, c('#3a6aa8')); }
+  }
+  /* 机のライト（腕を曲げて、頭を画面のほうへ）。夕方と夜は灯る */
+  function deskLamp(T, c, x, desk, env, dir) {      // dir：頭を向ける側（-1＝左）
+    const on = env.lights > 0.25, ex = x - dir * 3, ey = desk - 10, hx = x + dir * 2, hy = desk - 16;
+    T.R(x - 4, desk - 2, 8, 2, c('#3a3c44')); T.H(x - 4, desk - 2, 8, c('#55585f'));
+    T.line(x, desk - 2, ex, ey, c('#4a4c54')); T.line(ex, ey, hx, hy, c('#4a4c54')); T.P(ex, ey, c('#2e3036'));
+    T.poly([[hx - dir, hy - 2], [hx + dir * 4, hy - 1], [hx + dir * 7, hy + 4], [hx + dir * 1, hy + 4]], c('#c85a4a'));
+    T.P(hx, hy - 2, c('#e07a64')); T.P(hx + dir, hy - 2, c('#e07a64'));
+    const lx = hx + dir * 4, ly = hy + 4;
+    if (on) {
+      const g = T.g, gr = g.createRadialGradient(lx, desk, 1, lx, desk, 24);
+      gr.addColorStop(0, `rgba(255,210,140,${(0.34 * env.lights).toFixed(3)})`); gr.addColorStop(1, 'rgba(255,210,140,0)'); g.fillStyle = gr; g.fillRect(lx - 24, desk - 24, 48, 48);
+      T.H(Math.min(hx + dir, hx + dir * 6), ly, 5, '#ffe6a8');
+    }
+  }
+
   /* ---------- テレビ ---------- */
   function drawTV(T, c, VW, VH, F, env, port) {
-    const b = 4, inner = 2, panelH = port ? 14 : 0, panelW = port ? 0 : Math.max(22, Math.round(VW * 0.13)) - b;
-    const cab = { x: F.x - b, y: F.y - b, w: F.w + b * 2 + panelW, h: F.h + b * 2 + panelH };
+    const d = tvDims(VW, VH, port), { b, bev, dx, dy } = d;
+    const cab = { x: F.x - b, y: F.y - b, w: F.w + b * 2 + d.panel, h: F.h + b * 2 + d.panelH };
     const legH = 8, floorY = Math.min(VH - 3, cab.y + cab.h + legH);
     wall(T, c, VW, VH, '#d6c7a4', '#cdbd98', floorY);
     // 夜はテレビの光が壁と床に映る
     if (env.night > 0.3) { const g = T.g, gr = g.createRadialGradient(F.x + F.w / 2, F.y + F.h / 2, 4, F.x + F.w / 2, F.y + F.h / 2, Math.max(F.w, F.h) * 1.1); gr.addColorStop(0, `rgba(150,180,255,${0.22 * env.night})`); gr.addColorStop(1, 'rgba(150,180,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, VW, floorY); }
     floorBoards(T, c, VW, floorY, VH, '#8c6a48', '#76583a');
     if (env.night > 0.3) { const g = T.g, gr = g.createRadialGradient(F.x + F.w / 2, floorY + 4, 2, F.x + F.w / 2, floorY + 4, F.w * 0.7); gr.addColorStop(0, `rgba(150,180,255,${0.16 * env.night})`); gr.addColorStop(1, 'rgba(150,180,255,0)'); g.fillStyle = gr; g.fillRect(0, floorY, VW, VH - floorY); }
-    // 縦長の画面では床が広いので、敷物と、壁に時計
-    if (port) {
+    if (port) {         // 縦長の画面では床が広いので、敷物と、壁に時計
       const ry = floorY + Math.round((VH - floorY) * 0.5), rw = Math.round(VW * 0.36), rh = Math.max(4, Math.round((VH - floorY) * 0.22));
       T.ellipse(VW / 2, ry, rw, rh, c('#9a5a4a')); T.ellipse(VW / 2, ry, rw - 3, Math.max(2, rh - 2), c('#b46e58'));
       for (let x = -rw + 6; x < rw - 6; x += 6) T.P(VW / 2 + x, ry, c('#d49a72'));
-      const cx = Math.round(VW * 0.78), cy = Math.round(Math.max(10, (F.y - 18) * 0.55));
-      if (cy > 8 && cy + 8 < cab.y - 16) { T.circ(cx, cy, 6, c('#6a4a30')); T.circ(cx, cy, 5, c('#f2ead8')); T.line(cx, cy, cx, cy - 3, c('#2a2a2a')); T.line(cx, cy, cx + 2, cy + 1, c('#2a2a2a')); }
+      const cx = Math.round(VW * 0.78), cy = Math.round(Math.max(10, (cab.y - dy - 18) * 0.55));
+      if (cy > 8 && cy + 8 < cab.y - dy - 16) clock(T, c, cx, cy);
+    } else {            // 横長：左に低い棚と壁の絵、右に立てるライト（左右をそろえない）
+      const left = cab.x - 3, rs = cab.x + cab.w + dx + 3;
+      if (left >= 16) {
+        const sw = Math.min(left - 4, 30), sh = clamp(Math.round(cab.h * 0.34), 12, 19), sx = Math.max(2, Math.round((left - sw) * 0.4)), base = floorY + 2;
+        lowShelf(T, c, sx, base, sw, sh, VW);
+        const pw = clamp(sw - 6, 10, 20), ph = Math.round(pw * 0.78), px = sx + Math.round((sw - pw) * 0.62), py = Math.min(cab.y + 10, base - sh - ph - 14);
+        if (py > 4) picture(T, c, px, py, pw, ph);
+      }
+      if (VW - rs >= 12) floorLamp(T, c, rs + Math.round((VW - rs) * 0.5), floorY + 3, Math.max(4, cab.y - dy + 2), env);
     }
     // 脚
-    const lx0 = cab.x + 6, lx1 = cab.x + cab.w - 7, ly = cab.y + cab.h;
-    for (const [x, d] of [[lx0, -1], [lx1, 1]]) { T.line(x, ly, x + d * 2, floorY + 1, c('#3a2a1e')); T.line(x - d, ly, x + d, floorY + 1, c('#3a2a1e')); }
-    T.R(cab.x + 4, floorY + 1, cab.w - 8, 1, c('#5e4630', 0.6));
-    // アンテナ
-    const ax = cab.x + Math.round(cab.w * (port ? 0.5 : 0.42)), ay = cab.y, al = Math.max(4, Math.min(15, ay - 2));
-    T.R(ax - 3, ay - 2, 7, 2, c('#3a3a40'));
+    const lx0 = cab.x + 6, lx1 = cab.x + cab.w - 7 + Math.round(dx / 2), ly = cab.y + cab.h;
+    for (const [x, s] of [[lx0, -1], [lx1, 1]]) { T.line(x, ly, x + s * 2, floorY + 1, c('#3a2a1e')); T.line(x - s, ly, x + s, floorY + 1, c('#3a2a1e')); }
+    T.R(cab.x + 4, floorY + 1, cab.w - 8 + dx, 1, c('#5e4630', 0.6));
+    // 箱の上面と右の側面（奥行き）
+    const x1 = cab.x + cab.w, y1 = cab.y + cab.h;
+    T.poly([[cab.x, cab.y], [cab.x + dx, cab.y - dy], [x1 + dx, cab.y - dy], [x1, cab.y]], c('#94684a'));
+    T.H(cab.x + dx, cab.y - dy, cab.w, c('#ad8058'));
+    T.poly([[x1, cab.y], [x1 + dx, cab.y - dy], [x1 + dx, y1 - dy], [x1, y1]], c('#4a301e'));
+    for (let y = cab.y + 2; y < y1 - dy; y += 4) T.line(x1 + 1, y + 1, x1 + dx - 1, y - dy + 2, c('#3e2818'));
+    // アンテナ（上面に乗せる）
+    const ax = cab.x + Math.round(cab.w * (port ? 0.5 : 0.42)) + 2, ay = cab.y - dy + 1, al = Math.max(4, Math.min(15, ay - 2));
+    T.R(ax - 3, ay - 2, 7, 2, c('#3a3a40')); T.H(ax - 3, ay - 2, 7, c('#55555c'));
     const tip1 = [ax - Math.round(al * 0.9), ay - al], tip2 = [ax + Math.round(al * 0.75), ay - al - 1];
     T.line(ax - 1, ay - 2, tip1[0], tip1[1], c('#9aa0a8')); T.line(ax + 1, ay - 2, tip2[0], tip2[1], c('#9aa0a8'));
     T.P(tip1[0], tip1[1], c('#c8ccd2')); T.P(tip2[0], tip2[1], c('#c8ccd2'));
-    // 木の箱
+    // 正面の木の箱
     T.R(cab.x, cab.y, cab.w, cab.h, c('#6e4a2e'));
-    for (let y = cab.y + 2; y < cab.y + cab.h - 1; y += 3) for (let x = cab.x + ((y * 5) % 9); x < cab.x + cab.w - 2; x += 11) T.H(x, y, Math.min(5, cab.x + cab.w - 2 - x), c('#62412a'));
-    T.H(cab.x, cab.y, cab.w, c('#8a6040')); T.V(cab.x, cab.y, cab.h, c('#7e5636')); T.H(cab.x, cab.y + cab.h - 1, cab.w, c('#4e3420')); T.V(cab.x + cab.w - 1, cab.y, cab.h, c('#4e3420'));
-    // 画面のまわりの黒い縁
-    T.R(F.x - inner, F.y - inner, F.w + inner * 2, F.h + inner * 2, c('#24242a'));
+    for (let y = cab.y + 2; y < y1 - 1; y += 3) for (let x = cab.x + ((y * 5) % 9); x < x1 - 2; x += 11) T.H(x, y, Math.min(5, x1 - 2 - x), c('#62412a'));
+    T.H(cab.x, cab.y, cab.w, c('#8a6040')); T.V(cab.x, cab.y, cab.h, c('#7e5636')); T.H(cab.x, y1 - 1, cab.w, c('#4e3420')); T.V(x1 - 1, cab.y, cab.h, c('#4e3420'));
+    // 画面の穴のふち（上は影、下は光を受ける）
+    const o = { x: F.x - bev, y: F.y - bev, w: F.w + bev * 2, h: F.h + bev * 2 };
+    T.R(o.x - 1, o.y - 1, o.w + 2, 1, c('#4a3220')); T.R(o.x - 1, o.y - 1, 1, o.h + 2, c('#4a3220'));
+    T.R(o.x - 1, o.y + o.h, o.w + 2, 1, c('#9a6e48')); T.R(o.x + o.w, o.y - 1, 1, o.h + 2, c('#8a6040'));
+    // 画面へ落ちこむ傾斜（奥にある画面）
+    for (let k = 0; k < bev; k++) {
+      const x0 = o.x + k, yy0 = o.y + k, w = o.w - k * 2, h = o.h - k * 2, sh = k / bev;
+      T.H(x0, yy0, w, c(sh < 0.5 ? '#1a1a1e' : '#141418'));
+      T.V(x0, yy0 + 1, h - 2, c('#24242a'));
+      T.V(x0 + w - 1, yy0 + 1, h - 2, c('#2c2c32'));
+      T.H(x0, yy0 + h - 1, w, c(k === 0 ? '#4a4a52' : '#3a3a42'));
+    }
     T.g.clearRect(F.x, F.y, F.w, F.h);
     // 丸い角
-    const rad = 4, dark = c('#24242a');
+    const rad = 5, dark = c('#141418');
     for (let y = 0; y < rad; y++) for (let x = 0; x < rad; x++) if ((rad - x - 0.5) ** 2 + (rad - y - 0.5) ** 2 > rad * rad) {
       T.P(F.x + x, F.y + y, dark); T.P(F.x + F.w - 1 - x, F.y + y, dark); T.P(F.x + x, F.y + F.h - 1 - y, dark); T.P(F.x + F.w - 1 - x, F.y + F.h - 1 - y, dark);
     }
-    // 走査線と、ガラスの丸みの映り込み・すみの暗さ
+    // 走査線、上の縁が落とす影、ガラスの丸みの映り込み・すみの暗さ
     for (let y = F.y + 1; y < F.y + F.h; y += 2) T.R(F.x, y, F.w, 1, 'rgba(0,0,0,0.07)');
-    for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const u = (x / F.w - 0.5) * 2, v = (y / F.h - 0.5) * 2, d = u * u * u * u + v * v * v * v; if (d > 0.55 && bay(x, y) < (d - 0.55) * 0.9) T.P(F.x + x, F.y + y, 'rgba(0,0,0,0.35)'); }
-    for (let k = 0; k < Math.min(F.w, F.h) * 0.3; k++) T.P(F.x + 5 + k, F.y + 3 + Math.round(k * k * 0.02), 'rgba(255,255,255,0.12)');
+    T.R(F.x, F.y, F.w, 1, 'rgba(0,0,0,0.28)'); T.R(F.x, F.y + 1, F.w, 1, 'rgba(0,0,0,0.12)'); T.R(F.x, F.y, 1, F.h, 'rgba(0,0,0,0.14)');
+    for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const u = (x / F.w - 0.5) * 2, v = (y / F.h - 0.5) * 2, dd = u * u * u * u + v * v * v * v; if (dd > 0.5 && bay(x, y) < (dd - 0.5) * 1.0) T.P(F.x + x, F.y + y, 'rgba(0,0,0,0.38)'); }
+    const hl = Math.min(F.w, F.h);
+    for (let k = 0; k < hl * 0.38; k++) { const yy = F.y + 4 + Math.round(k * k * 0.018); T.P(F.x + 6 + k, yy, 'rgba(255,255,255,0.16)'); T.P(F.x + 6 + k, yy + 1, 'rgba(255,255,255,0.07)'); }
+    for (let k = 0; k < hl * 0.12; k++) T.P(F.x + 4, F.y + 7 + k, 'rgba(255,255,255,0.1)');
     // つまみとスピーカー
-    const knob = (x, y) => { T.circ(x, y, 3, c('#2e2e34')); T.circ(x, y, 2, c('#c8c0b0')); T.P(x, y - 2, c('#2e2e34')); T.P(x - 1, y - 1, c('#e4ddcc')); };
+    const knob = (x, y) => { T.circ(x, y, 3, c('#2e2e34')); T.circ(x, y, 2, c('#c8c0b0')); T.P(x, y - 2, c('#2e2e34')); T.P(x - 1, y - 1, c('#e4ddcc')); T.P(x + 1, y + 3, c('#000000', 0.25)); };
     if (port) {
-      const py = F.y + F.h + inner + 3, ph = cab.y + cab.h - py - 3;
+      const py = F.y + F.h + bev + 3, ph = y1 - py - 3;
       T.R(cab.x + 6, py, Math.round(cab.w * 0.55), ph, c('#4a3220'));
       for (let y = py + 1; y < py + ph; y += 2) T.H(cab.x + 7, y, Math.round(cab.w * 0.55) - 2, c('#2e2016'));
-      knob(cab.x + cab.w - 18, py + ph / 2); knob(cab.x + cab.w - 9, py + ph / 2);
+      knob(x1 - 18, py + ph / 2); knob(x1 - 9, py + ph / 2);
     } else {
-      const px = F.x + F.w + inner + 3, pw = cab.x + cab.w - px - 3;
-      knob(px + pw / 2, F.y + 6); knob(px + pw / 2, F.y + 15);
-      const gy = F.y + 23, gh = Math.max(6, F.y + F.h - gy - 4);
+      const px = F.x + F.w + bev + 4, pw = x1 - px - 4;
+      knob(px + pw / 2, F.y + 4); knob(px + pw / 2, F.y + 13);
+      const gy = F.y + 21, gh = Math.max(6, F.y + F.h - gy - 2);
       T.R(px, gy, pw, gh, c('#4a3220')); for (let y = gy + 1; y < gy + gh; y += 2) T.H(px + 1, y, pw - 2, c('#2e2016'));
     }
-    const led = port ? [cab.x + cab.w - 5, cab.y + cab.h - 4] : [cab.x + cab.w - 5, F.y + F.h - 1];
+    const led = port ? [x1 - 5, y1 - 4] : [x1 - 5, F.y + F.h + 2];
     T.P(led[0], led[1], env.night > 0.3 ? '#ff5a3a' : c('#c84a30'));
     return {};
   }
@@ -187,8 +286,7 @@
       const sy = Math.round(F.y - tb - b - Math.max(10, (F.y - tb - b) * 0.35)), sx0 = Math.round(VW * 0.14), sx1 = Math.round(VW * 0.62);
       if (sy > 16) {
         T.R(sx0, sy, sx1 - sx0, 2, c('#8a6040')); T.H(sx0, sy, sx1 - sx0, c('#a87a50')); T.P(sx0 + 3, sy + 2, c('#6a4a30')); T.P(sx1 - 4, sy + 2, c('#6a4a30'));
-        const books = ['#7a8fb0', '#c8846a', '#e0c070', '#6f9a7a', '#b06a7a', '#8a7ab0', '#d8d0c0'], r = E.RNG(VW * 3 + 7);
-        let x = sx0 + 3; for (let i = 0; x < sx1 - 10 && i < 9; i++) { const h = 7 + (r() * 5 | 0), w = 2 + (r() * 2 | 0), col = books[i % books.length]; T.R(x, sy - h, w, h, c(col)); T.H(x, sy - h + 2, w, c('#f0e8d8', 0.5)); x += w + (r() < 0.2 ? 1 : 0); }
+        const x = books(T, c, sx0 + 3, sx1 - 10, sy, VW * 3 + 7, 11);
         T.poly([[x + 1, sy], [x + 9, sy - 7], [x + 11, sy - 6], [x + 3, sy]], c('#6f9a7a'));     // 寝かせた本
         plant(T, c, sx1 - 4, sy);
       }
@@ -219,7 +317,22 @@
     T.ellipse(mx + mw / 2, my + mh / 2, mw / 2, mh / 2, c('#dfe1e5')); T.H(mx + 1, my + Math.round(mh * 0.4), mw - 1, c('#aeb2ba')); T.V(mx + Math.round(mw / 2), my + 1, Math.round(mh * 0.4), c('#aeb2ba'));
     T.H(mx, my + mh + 1, mw + 1, c('#7a5c3e'));
     const m = mug(T, c, Math.max(3, kx - 10), ky + kh);
-    if (!port) plant(T, c, Math.round(F.x + F.w + (VW - F.x - F.w) * 0.5), deskY + Math.min(6, surf - 2));
+    if (!port) {       // 横長：左の壁にコルクボード、右の壁に本の棚と机のライト。机の左はしに植物
+      const left = F.x - b - 3, rs = F.x + F.w + b + 3, top = F.y - b - tb;
+      if (left >= 14) {
+        const cw = Math.min(left - 4, 28), ch = clamp(Math.round(cw * 0.85), 12, Math.round(F.h * 0.6));
+        corkboard(T, c, Math.round((left - cw) * 0.5) + 1, Math.round(top + F.h * 0.16), cw, ch);
+        if (kx - 12 > 8) plant(T, c, Math.max(5, Math.round((kx - 12) * 0.35)), deskY + Math.min(6, surf - 2));
+      }
+      const rw = VW - rs;
+      if (rw >= 12) {
+        const sx0 = rs + Math.round(rw * 0.12), sx1 = VW - Math.max(2, Math.round(rw * 0.15)), sy = Math.round(top + F.h * 0.3);
+        T.R(sx0 - 1, sy, sx1 - sx0 + 2, 2, c('#8a6040')); T.H(sx0 - 1, sy, sx1 - sx0 + 2, c('#a87a50')); T.P(sx0 + 1, sy + 2, c('#6a4a30')); T.P(sx1 - 2, sy + 2, c('#6a4a30'));
+        books(T, c, sx0 + 1, sx1 - 1, sy, VW + 11, 9);
+        if (rw >= 22) clock(T, c, sx0 + Math.round((sx1 - sx0) * 0.6), Math.max(8, sy - 20));
+        deskLamp(T, c, rs + Math.round(rw * 0.6), deskY + Math.min(5, surf - 3), env, -1);
+      }
+    }
     return { mug: m };
   }
 
