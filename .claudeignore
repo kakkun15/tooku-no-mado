@@ -1,0 +1,20 @@
+# Large data files (Base64 music notes & long notes)
+music.js
+music-cc.js
+music-mine.js
+notes-long.js
+notes.js
+
+# Media / Binary files
+keepawake.mp4
+*.png
+*.ico
+*.zip
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Heavy documentation files (Reference only when explicitly needed)
+CREDITS.md
+HISTORY.md

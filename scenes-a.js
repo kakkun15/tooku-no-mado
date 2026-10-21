@@ -176,7 +176,7 @@
       for (let y = s.top; y < H; y++) { const v = (y - s.top) / (H - s.top); T.R(s.xl(v) - 3, y, 1 + v * 2, 1, env.col(snow ? '#c8d2dc' : '#3f6a36')); T.R(s.xr(v) + 2, y, 1 + v * 2, 1, env.col(snow ? '#c8d2dc' : '#3f6a36')); }
       // 滝の印の色が残ったところ＝見えている滝
       s.fallMask = null;
-      { const f = s.fall, id = T.g.getImageData(f.x, f.y, f.w, f.h).data, m = []; for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) { const q = (j * f.w + i) * 4; if (id[q] === 255 && id[q + 1] === 0 && id[q + 2] === 254) { m.push([i, j]); T.P(f.x + i, f.y + j, env.col('#bcdcf2', 0.25)); } } s.fallMask = m; }
+      { const f = s.fall, id = T.g.getImageData(f.x, f.y, f.w, f.h).data, m = []; for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) { const q = (j * f.w + i) * 4; if (id[q] >= 240 && id[q + 1] <= 20 && id[q + 2] >= 240) { m.push([i, j]); T.P(f.x + i, f.y + j, env.col('#bcdcf2', 0.25)); } } s.fallMask = m; }
       // 手前の葦
       if (!snow) {
         for (let x = 0; x < Math.min(W * 0.28, s.xl(0.95) + 10); x += r.int(1, 3)) { const h = r.int(6, 14), c = r() < 0.5 ? '#4f7a34' : '#6a9440'; T.V(x, H - h, h, env.col(c)); if (r() < 0.2) T.R(x, H - h - 3, 1, 3, env.col('#7a4a26')); }
