@@ -71,14 +71,16 @@
 
   /* ---------- 設定 ---------- */
   const P = window.TOOKU_PREFS;
+  // 曲の音量（0〜100）→ 実際の大きさ。耳は「何倍か」で感じるので2乗にして、どこを動かしても同じくらい変わるようにする
+  const volGain = () => { const v = Math.max(0, Math.min(100, +P.get('vol') || 0)) / 100; return v * v; };
   function applyVolumes() {
     if (!ac) return;
     const t = ac.currentTime;
     // setTargetAtTime だけだと Safari で反映が遅れることがあるので、今の値から短く傾けて切り替える
     const to = (prm, v, sec) => { try { prm.cancelScheduledValues(t); prm.setValueAtTime(prm.value, t); prm.linearRampToValueAtTime(v, t + sec); } catch (e) { prm.value = v; } };
-    to(musicGain.gain, P.get('mode') === 'bg' ? 0 : P.get('vol') / 100, 0.04);
+    to(musicGain.gain, P.get('mode') === 'bg' ? 0 : volGain(), 0.04);
     to(ambGain.gain, P.get('amb') / 100 * 0.9, 0.08);
-    el.volume = Math.min(1, P.get('vol') / 100);
+    el.volume = volGain();
   }
 
   /* ---------- 選曲 ---------- */
@@ -133,15 +135,18 @@
     const bg = P.get('mode') === 'bg', opt = { family, slow: F ? F.slow : TEMPO[+P.get('slow')] || 1, calm: F ? !!F.calm : isCalm(piece), seed: F ? F.seed : Math.random() * 1000 | 0 };
     const r = await renderJob(piece, opt, bg);
     const item = { piece, family, dur: r.dur, bg, opt };
-    if (bg) { item.wav = r.wav; item.url = wavUrl(r.wav); }
+    if (bg) { item.wav = r.wav; item.url = wavUrl(r.wav, item); if (FIXED_VOL) prepLive(item); }
     else { ensureAC(); const b = ac.createBuffer(1, r.pcm.length, r.sr); if (b.copyToChannel) b.copyToChannel(r.pcm, 0); else b.getChannelData(0).set(r.pcm); item.buf = b; }
     return item;
   }
   function release(item) { if (item && item.url) URL.revokeObjectURL(item.url); }
   // iPhone・iPad では audio 要素の音量を変えられない（いつも最大）。そこで音量を掛けた WAV を作って流す
-  const FIXED_VOL = (() => { try { const a = new Audio(); a.volume = 0.5; return Math.abs(a.volume - 0.5) > 0.01; } catch (e) { return false; } })();
-  function wavUrl(wav) {
-    const g = FIXED_VOL ? Math.min(1, P.get('vol') / 100) : 1;
+  // 読み返しでは分からない（今の iOS は入れた値をそのまま返すのに音は変わらない）ので、iPhone・iPad は決め打ち
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document);
+  const FIXED_VOL = IOS || (() => { try { const a = new Audio(); a.volume = 0.5; return Math.abs(a.volume - 0.5) > 0.01; } catch (e) { return false; } })();
+  function wavUrl(wav, item) {
+    const g = FIXED_VOL ? volGain() : 1;
+    if (item) item.uv = g;
     if (g >= 0.999) return URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
     const src = new Int16Array(wav, 44), out = new ArrayBuffer(wav.byteLength), dst = new Int16Array(out, 44);
     new Uint8Array(out, 0, 44).set(new Uint8Array(wav, 0, 44));
@@ -149,20 +154,34 @@
     return URL.createObjectURL(new Blob([out], { type: 'audio/wav' }));
   }
   let swapping = false;
+  let swapGen = 0;
   function reapplyBgVolume() {
+    clearTimeout(volT);
     if (!FIXED_VOL) return;
-    for (const it of [S.next]) if (it && it.wav) { const u = wavUrl(it.wav); release(it); it.url = u; }
-    const c = S.cur; if (!c || !c.wav) return;
+    const c = S.cur; if (!c || !c.wav) { liveStop(); return; }
+    if (c.uv === volGain() && !LIVE.src) return;
     const isCur = el.src === c.url, pos = el.currentTime || 0, wasPlaying = isCur && !el.paused;
-    const u = wavUrl(c.wav); release(c); c.url = u;
+    const u = wavUrl(c.wav, c); release(c); c.url = u;
     if (!isCur) { liveStop(); return; }
-    swapping = true; el.src = u;
+    const gen = ++swapGen; swapping = true; el.src = u;
     el.addEventListener('loadedmetadata', () => {
+      if (gen !== swapGen) return;
       const live = LIVE.src && LIVE.item === c;
       try { el.currentTime = live ? livePos() : pos; } catch (e) {}
-      if (live) { el.addEventListener('playing', liveStop, { once: true }); setTimeout(() => { if (!el.paused) liveStop(); }, 1500); } else liveStop();
-      if (wasPlaying) { const r = el.play(); if (r && r.catch) r.catch(() => {}); }
-      setTimeout(() => { swapping = false; }, 300);
+      const done = () => { if (gen !== swapGen) return; setTimeout(() => { swapping = false; }, 300); };
+      if (!wasPlaying) { liveStop(); done(); return; }
+      if (live) {
+        // 鳴りはじめたら、Web Audio の位置とのずれを確かめてから受け渡す（ずれていればもう一度合わせる）
+        el.addEventListener('playing', () => {
+          if (gen !== swapGen) return;
+          const d = (el.currentTime || 0) - livePos();
+          if (Math.abs(d) > 0.06) { try { el.currentTime = livePos(); } catch (e) {} el.addEventListener('seeked', () => { if (gen === swapGen) liveHandOff(); }, { once: true }); }
+          else liveHandOff();
+          done();
+        }, { once: true });
+        setTimeout(() => { if (gen === swapGen && LIVE.src) liveHandOff(); }, 1500);
+      } else { liveStop(); done(); }
+      const r = el.play(); if (r && r.catch) r.catch(() => { if (gen === swapGen) { liveStop(); S.playing = false; emit(); } });
     }, { once: true });
   }
   function stopSource() { if (LIVE.src) liveStop(); if (S.src) { try { S.src.onended = null; S.src.stop(); } catch (e) {} S.src = null; } }
@@ -172,6 +191,7 @@
     if (offset > 0.3 || !S.playing) softStart();
     if (c.bg) {
       stopSource();
+      if (FIXED_VOL && c.wav && c.uv !== volGain()) { const u = wavUrl(c.wav, c); release(c); c.url = u; }   // 前に作ったときと音量が違えば作り直す
       el.src = c.url; el.currentTime = 0;
       const go = () => { try { el.currentTime = offset; } catch (e) {} const r = el.play(); if (r && r.catch) r.catch(() => { S.playing = false; emit(); }); };
       if (el.readyState >= 1) go(); else el.addEventListener('loadedmetadata', go, { once: true });
@@ -215,7 +235,7 @@
   el.addEventListener('pause', () => { if (!swapping && P.get('mode') === 'bg' && !el.ended && S.playing && S.cur && el.src === S.cur.url) { S.playing = false; emit(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = performance.now(); });
   let hiddenAt = 0;
-  el.addEventListener('play', () => { if (hiddenAt && performance.now() - hiddenAt > 500) { hiddenAt = 0; softStart(); } if (P.get('mode') === 'bg' && S.cur && el.src === S.cur.url) { S.playing = true; emit(); } });
+  el.addEventListener('play', () => { if (!swapping && !LIVE.src && hiddenAt && performance.now() - hiddenAt > 500) { hiddenAt = 0; softStart(); } if (P.get('mode') === 'bg' && S.cur && el.src === S.cur.url) { S.playing = true; emit(); } });
 
   function unlock() {           // 最初のタップの中で音の出口を開けておく
     ensureAC();
@@ -263,24 +283,43 @@
      audio 要素は消音で流し続け、指を離したら音量を掛けた WAV に入れ替えて、Web Audio の位置に合わせて戻す */
   const LIVE = { src: null, gain: null, at: 0, off: 0, item: null };
   const livePos = () => LIVE.off + (ac.currentTime - LIVE.at);
+  // 曲の用意ができたら、Web Audio 用の音も先に作っておく（動かした瞬間に固まらないように）
+  function prepLive(item) {
+    if (!ac || item.liveBuf || item.livePrep) return;
+    item.livePrep = ac.decodeAudioData(item.wav.slice(0)).then(b => { item.liveBuf = b; }).catch(() => {});
+  }
+  function ramp(prm, v, sec) { const t = ac.currentTime; try { prm.cancelScheduledValues(t); prm.setTargetAtTime(v, t, sec / 3); } catch (e) { prm.value = v; } }
   function liveStart() {
     const c = S.cur; if (LIVE.src || !c || !c.wav || !S.playing || el.paused || document.hidden) return;
-    ensureAC(); if (ac.state !== 'running') return;
-    if (!c.liveBuf) { const src = new Int16Array(c.wav, 44), b = ac.createBuffer(1, src.length, new DataView(c.wav).getUint32(24, true)), d = b.getChannelData(0); for (let i = 0; i < src.length; i++) d[i] = src[i] / 32768; c.liveBuf = b; }
+    ensureAC();
+    // 音の出口が止まっている（bg では多い）ときは、起こしてからもう一度
+    if (ac.state !== 'running') { const r = ac.resume(); if (r && r.then) r.then(() => { if (ac.state === 'running') liveStart(); }).catch(() => {}); return; }
+    if (!c.liveBuf) { prepLive(c); if (c.livePrep) c.livePrep.then(() => liveStart()); return; }
     if (!LIVE.gain) { LIVE.gain = ac.createGain(); LIVE.gain.connect(master); }
-    LIVE.gain.gain.value = Math.min(1, P.get('vol') / 100);
     const x = ac.createBufferSource(); x.buffer = c.liveBuf; x.connect(LIVE.gain);
-    LIVE.off = el.currentTime || 0; LIVE.at = ac.currentTime; x.start(0, LIVE.off);
-    LIVE.src = x; LIVE.item = c; el.muted = true;
+    const lead = 0.04;
+    LIVE.gain.gain.cancelScheduledValues(0); LIVE.gain.gain.value = 0;
+    LIVE.off = (el.currentTime || 0) + lead; LIVE.at = ac.currentTime + lead; x.start(LIVE.at, LIVE.off);
+    LIVE.src = x; LIVE.item = c;
+    const t = LIVE.at; LIVE.gain.gain.setValueAtTime(0, t); LIVE.gain.gain.linearRampToValueAtTime(volGain(), t + 0.03);
+    setTimeout(() => { if (LIVE.src === x) el.muted = true; }, lead * 1000 + 30);   // Web Audio が鳴りはじめてから audio 要素を消音
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden && LIVE.src) liveStop(); });   // 隠れると Web Audio は止まるので、audio 要素の音に戻す
+  // audio 要素に戻す：消音を外してから、Web Audio を短く下げて止める
+  function liveHandOff() {
+    const x = LIVE.src; if (!x) { el.muted = false; return; }
+    el.muted = false; ramp(LIVE.gain.gain, 0, 0.07);
+    LIVE.src = null; LIVE.item = null;
+    setTimeout(() => { try { x.stop(); } catch (e) {} }, 120);
+  }
   function liveStop() { if (LIVE.src) { try { LIVE.src.stop(); } catch (e) {} LIVE.src = null; } LIVE.item = null; el.muted = false; }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && LIVE.src) { liveStop(); reapplyBgVolume(); } });   // 隠れると Web Audio は止まるので、audio 要素の音に戻す
   P.on('vol', () => {
     applyVolumes();
     if (!(FIXED_VOL && P.get('mode') === 'bg')) return;
     liveStart();
-    if (LIVE.src && LIVE.gain) { const t = ac.currentTime, g = LIVE.gain.gain; try { g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(Math.min(1, P.get('vol') / 100), t + 0.03); } catch (e) { g.value = Math.min(1, P.get('vol') / 100); } }
-    clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 600);
+    if (LIVE.src && LIVE.gain) ramp(LIVE.gain.gain, volGain(), 0.03);
+    // 入れ替えは指を離したとき（volCommit）。離したのが分からなかったときの保険で 1.5 秒
+    clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 1500);
   });
   P.on('amb', applyVolumes);
   P.on('moods', () => { if (S.next && !allowed(S.next.piece)) { release(S.next); S.next = null; prefetch(); } });
@@ -378,7 +417,7 @@
     ensureAC();
     if (AMB.pending) { const k = AMB.pending; AMB.pending = null; AMB.kinds = ''; setAmbience(k); }   // 環境音もいっしょに聞こえるように
     const t0 = Math.max(ac.currentTime + 0.03, sampleEnd), g = ac.createGain();
-    g.gain.value = Math.min(1, P.get('vol') / 100); g.connect(master);
+    g.gain.value = volGain(); g.connect(master);
     [72, 76, 79, 84, 79, 76].forEach((p, i) => {
       const f = 440 * Math.pow(2, (p - 69) / 12), st = t0 + i * 0.2;
       [[1, 0.2], [2, 0.05], [3.01, 0.02]].forEach(([m, a]) => {
@@ -415,7 +454,7 @@
 
   window.TookuPlayer = {
     syncState, follow, unfollow, get following() { return !!S.follow; },
-    sample, _live: () => ({ live: !!LIVE.src, muted: el.muted, t: el.currentTime }),   // 確かめ用
+    sample, volCommit: () => { if (FIXED_VOL && P.get('mode') === 'bg') reapplyBgVolume(); }, _live: () => ({ live: !!LIVE.src, muted: el.muted, t: el.currentTime, ac: ac && ac.state, fixed: FIXED_VOL }),   // 確かめ用
     PIECES, DARK, FAMILY_NAME, GROUP_NAME, moodOf, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
     setAmbience: kinds => { if (ac) setAmbience(kinds); else AMB.pending = kinds; },

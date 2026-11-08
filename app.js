@@ -16,7 +16,7 @@
       const el = $(id), show = () => { $(id + 'n').textContent = el.value; };
       el.value = P.get(key); show();
       el.addEventListener('input', () => { P.set(key, +el.value); show(); });
-      el.addEventListener('change', () => PL.sample());   // 指を離したら、その大きさで鳴らす
+      el.addEventListener('change', () => { if (key === 'vol') PL.volCommit(); PL.sample(); });   // 指を離したら、その大きさで鳴らす
     });
     $('tryVol').onclick = () => PL.sample();
   }
@@ -233,7 +233,7 @@
     const key = el.dataset.switch, sync = () => el.classList.toggle('on', !!P.get(key));
     el.onclick = () => { P.set(key, !P.get(key)); sync(); }; sync();
   });
-  document.querySelectorAll('[data-range]').forEach(el => { const key = el.dataset.range; el.value = P.get(key); el.oninput = () => P.set(key, +el.value); P.on(key, v => { if (+el.value !== v) el.value = v; }); });
+  document.querySelectorAll('[data-range]').forEach(el => { const key = el.dataset.range; el.value = P.get(key); el.oninput = () => P.set(key, +el.value); if (key === 'vol') el.addEventListener('change', () => PL.volCommit()); P.on(key, v => { if (+el.value !== v) el.value = v; }); });
 
   /* ---------- 曲の一覧 ---------- */
   function renderSongs() {
