@@ -290,21 +290,22 @@
     const fy = y0 + ap + Math.round(H * 0.3);
     g.fillStyle = grad(y0 + ap, fy, '#1e1914', '#2c241d'); g.fillRect(0, y0 + ap, VW, fy - y0 - ap);
     T.R(0, fy - 2, VW, 2, c('#3a2f26'));
-    // 床：奥は暗く、手前ほど明るい板。板の幅は手前ほど広く（遠近）、色は板ごとに少しずつ違える
-    g.fillStyle = grad(fy, VH, '#4a3222', '#8a5a36'); g.fillRect(0, fy, VW, VH - fy);
-    const tones = ['#000', '#000', '#2a1a10', '#ffd9a0', '#000', '#ffd9a0'];
-    let y = fy, row = 0;
-    while (y < VH) {
-      const h = 4 + Math.round(row * 1.6), off = (row * 41) % 37, len = 52 + (row % 3) * 14;
+    // 床：板の太さはそろえる。板ごとに近い木の色を使い分け（変わりすぎない範囲）、奥だけ机の影で少し暗く
+    const WOOD = ['#8a5c3a', '#946540', '#7f5536', '#9a6a44', '#865a3c'];
+    const ph = Math.max(5, Math.round((VH - fy) / 7));
+    for (let y = fy, row = 0; y < VH; y += ph, row++) {
+      const off = (row * 53) % 71, len = 96 + (row % 3) * 22;
       for (let x = -off, k = 0; x < VW; x += len, k++) {
-        const t = tones[(row * 5 + k * 3) % tones.length];
-        if (t !== '#000') { g.fillStyle = t; g.globalAlpha = t === '#ffd9a0' ? 0.07 : 0.22; g.fillRect(x, y, len, h); g.globalAlpha = 1; }
-        T.V(x, y + 1, h - 2, c('#5a3a24'));                    // 板の継ぎ目（うすく）
-        if (h >= 6) T.H(x + 6 + (k * 7) % 13, y + Math.round(h / 2), Math.round(len * 0.35), c('#7a4e2e'));   // 木目
+        const base = WOOD[(row * 3 + k * 2 + (row * k) % 3) % WOOD.length];
+        T.R(x, y, len, ph, c(base));
+        T.H(x + 1, y, len - 2, c(WOOD[(row + k + 3) % WOOD.length]));                      // 面の上の光
+        T.H(x + 8 + (k * 7) % 23, y + Math.round(ph * 0.45), Math.round(len * 0.3), c('#7c5032')); T.H(x + Math.round(len * 0.55), y + Math.round(ph * 0.3), Math.round(len * 0.2), c('#7c5032'));   // 木目
+        if (ph >= 7) T.H(x + 14 + (k * 5) % 9, y + ph - 3, Math.round(len * 0.25), c('#7a4e30'));
+        T.V(x, y + 1, ph - 2, c('#6a4429'));                                                        // 板の継ぎ目
       }
-      T.H(0, y + h - 1, VW, c('#4a2f1c'));   // 板と板のすき間・面の光
-      y += h; row++;
+      T.H(0, y + ph - 1, VW, c('#6a4429'));                                                 // 板と板のすき間
     }
+    { const gr = g.createLinearGradient(0, fy, 0, fy + (VH - fy) * 0.6); gr.addColorStop(0, 'rgba(20,10,4,.45)'); gr.addColorStop(1, 'rgba(20,10,4,0)'); g.fillStyle = gr; g.fillRect(0, fy, VW, VH - fy); }
     // 机の脚（左右）と床に落ちる影
     const lw = Math.max(3, Math.round(VW * 0.035));
     [[2, 1], [VW - 2 - lw, -1]].forEach(([x]) => {
