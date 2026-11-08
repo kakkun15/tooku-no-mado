@@ -5,7 +5,7 @@ VW=int(os.environ.get('VW',1024)); VH=int(os.environ.get('VH',768)); WAIT=int(os
 async def main():
     pre=sys.argv[1]
     async with async_playwright() as p:
-        b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
+        b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium-1243/chrome-linux64/chrome')
         ctx=await b.new_context(viewport={'width':VW,'height':VH})
         errs=[]
         for i,job in enumerate(sys.argv[2:]):

@@ -388,6 +388,20 @@
     const r = e.target.closest('[data-reset]'); if (r) { G.reset(+r.dataset.reset); renderGanba(); }
   });
   $('gList').addEventListener('change', e => { const m = e.target.closest('[data-min]'); if (m && m.value !== '' && isFinite(+m.value)) { G.setLen(+m.dataset.min, Math.max(0, Math.round(+m.value)) * 60e3); renderGanba(); } });
+  $('gIoT').onclick = () => $('gIo').classList.toggle('open');
+  $('gExp').onclick = async () => {
+    const t = G.exportText(), ta = $('gIoTxt'); ta.value = t;
+    let ok = false;
+    try { await navigator.clipboard.writeText(t); ok = true; } catch (e) { try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch (x) {} }
+    $('gIoMsg').textContent = ok ? 'コピーしました。メモ帳などに貼っておいてね' : '下の文を長押しで全部選んでコピーしてね';
+  };
+  $('gImp').onclick = () => {
+    const r = G.importText($('gIoTxt').value);
+    if (!r.ok) { $('gIoMsg').textContent = r.why; return; }
+    gOpen = -1;
+    $('gIoMsg').textContent = r.add + '回分を足しました' + (r.same ? '（もうあった' + r.same + '回は飛ばしました）' : '') + (r.bad ? '（読めない行が' + r.bad + 'つ）' : '');
+    $('gIoTxt').value = ''; renderGanba();
+  };
   G.on(() => { tickGanba(); if (pops.ganba.classList.contains('open')) renderGanba(); });
   tickGanba();
 

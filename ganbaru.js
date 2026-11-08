@@ -68,5 +68,45 @@
   // 押し忘れたときに足す目安（分）
   const ADDS = [15, 30, 60, 120];
 
-  window.TookuGanbaru = { start, stop, running, elapsed, adjust, setLen, reset, add, ADDS, days, today, total, first, recent, dayKey, fmt, PRESETS, DAY_START, on: f => { subs.add(f); return () => subs.delete(f); } };
+  /* 書き出し・読み込み（端末をまたぐ）。メモ帳に貼っても何か分かるよう、人が読める文で書く。
+     1行＝1回：「2026/11/09（月） 20:15:03 〜 2026/11/09 22:00:10　1時間45分」。直した分は終わりに反映して書く */
+  const p2 = n => String(n).padStart(2, '0');
+  const ymd = ms => { const d = new Date(ms); return d.getFullYear() + '/' + p2(d.getMonth() + 1) + '/' + p2(d.getDate()); };
+  const hms = ms => { const d = new Date(ms); return p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); };
+  const WDS = ['日', '月', '火', '水', '木', '金', '土'];
+  const HEAD = '【とおくの窓・がんばるの記録】';
+  function exportText() {
+    const rows = D.log.map(r => [r[0], effEnd(r), r[3]]).filter(r => r[1] - r[0] >= 1000).sort((a, b) => a[0] - b[0]);
+    const tot = rows.reduce((a, r) => a + r[1] - r[0], 0), now = Date.now();
+    return [HEAD,
+      'これは「とおくの窓」の、がんばった時間の記録です。消さないでね。',
+      'べつの端末で使うときは、この文を全部コピーして、がんばる →「記録を べつの端末へ」に貼って読み込んでください。',
+      '書き出した日：' + ymd(now) + ' ' + hms(now).slice(0, 5) + '　回数：' + rows.length + '回　合計：' + fmt(tot),
+      running() ? '（いま数えている回は入っていません。「おわる」を押してから書き出すと入ります）' : null,
+      '――――――――',
+      ...rows.map(([s, e, a]) => `${ymd(s)}（${WDS[new Date(s).getDay()]}） ${hms(s)} 〜 ${ymd(e)} ${hms(e)}　${fmt(e - s)}${a ? '（あとから足した）' : ''}`),
+      '――――――――', 'ここまで'].filter(x => x !== null).join('\n');
+  }
+  // 貼られた文を読む。手元の記録と「合わせる」（同じ始まりの記録は手元を残す）。数を返す
+  function importText(text) {
+    if (!text || text.indexOf('がんばるの記録') < 0) return { ok: false, why: 'がんばるの記録の文ではないみたい' };
+    const re = /(\d{4})\/(\d{1,2})\/(\d{1,2})\S*\s+(\d{1,2}):(\d{2}):(\d{2})\s*〜\s*(?:(\d{4})\/(\d{1,2})\/(\d{1,2})\S*\s+)?(\d{1,2}):(\d{2}):(\d{2})([^\n]*)/g;
+    const have = new Set(D.log.map(r => Math.round(r[0] / 1000)));
+    let m, add = 0, same = 0, bad = 0;
+    while ((m = re.exec(text))) {
+      const n = m.slice(1, 13).map(x => x === undefined ? null : +x);
+      const s = new Date(n[0], n[1] - 1, n[2], n[3], n[4], n[5]).getTime();
+      let e = n[6] !== null ? new Date(n[6], n[7] - 1, n[8], n[9], n[10], n[11]).getTime() : new Date(n[0], n[1] - 1, n[2], n[9], n[10], n[11]).getTime();
+      if (n[6] === null && e < s) e += 864e5;   // 日付なしで日をまたいだとき
+      if (!(e - s >= 1000) || e - s > MAX_MS || s > Date.now() + 864e5) { bad++; continue; }
+      const k = Math.round(s / 1000);
+      if (have.has(k)) { same++; continue; }
+      have.add(k); D.log.push(m[13].indexOf('あとから足した') >= 0 ? [s, e, 0, 1] : [s, e, 0]); add++;
+    }
+    if (!add && !same) return { ok: false, why: bad ? '記録の行が読めなかった' : '記録の行が見つからなかった' };
+    D.log.sort((a, b) => a[0] - b[0]); save(); emit();
+    return { ok: true, add, same, bad };
+  }
+
+  window.TookuGanbaru = { start, stop, running, elapsed, adjust, setLen, reset, add, ADDS, exportText, importText, days, today, total, first, recent, dayKey, fmt, PRESETS, DAY_START, on: f => { subs.add(f); return () => subs.delete(f); } };
 })();

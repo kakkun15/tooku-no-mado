@@ -279,6 +279,48 @@
     return {};
   }
 
+  /* 縦長のパソコン：机の下（幕板・奥の暗がり・机の脚・床の板・椅子の背） */
+  function underDesk(T, c, VW, VH, y0, F) {
+    const H = VH - y0; if (H < 16) return;
+    const g = T.g, grad = (y1, y2, a, b) => { const gr = g.createLinearGradient(0, y1, 0, y2); gr.addColorStop(0, c(a)); gr.addColorStop(1, c(b)); return gr; };
+    // 幕板
+    const ap = Math.max(3, Math.round(H * 0.07));
+    T.R(0, y0, VW, ap, c('#6e5038')); T.H(0, y0 + ap - 1, VW, c('#4a3626'));
+    // 奥の暗がり（机の下の壁）と幅木
+    const fy = y0 + ap + Math.round(H * 0.3);
+    g.fillStyle = grad(y0 + ap, fy, '#1e1914', '#2c241d'); g.fillRect(0, y0 + ap, VW, fy - y0 - ap);
+    T.R(0, fy - 2, VW, 2, c('#3a2f26'));
+    // 床：奥は暗く、手前ほど明るい板。板の幅は手前ほど広く（遠近）、色は板ごとに少しずつ違える
+    g.fillStyle = grad(fy, VH, '#4a3222', '#8a5a36'); g.fillRect(0, fy, VW, VH - fy);
+    const tones = ['#000', '#000', '#2a1a10', '#ffd9a0', '#000', '#ffd9a0'];
+    let y = fy, row = 0;
+    while (y < VH) {
+      const h = 4 + Math.round(row * 1.6), off = (row * 41) % 37, len = 52 + (row % 3) * 14;
+      for (let x = -off, k = 0; x < VW; x += len, k++) {
+        const t = tones[(row * 5 + k * 3) % tones.length];
+        if (t !== '#000') { g.fillStyle = t; g.globalAlpha = t === '#ffd9a0' ? 0.07 : 0.22; g.fillRect(x, y, len, h); g.globalAlpha = 1; }
+        T.V(x, y + 1, h - 2, c('#5a3a24'));                    // 板の継ぎ目（うすく）
+        if (h >= 6) T.H(x + 6 + (k * 7) % 13, y + Math.round(h / 2), Math.round(len * 0.35), c('#7a4e2e'));   // 木目
+      }
+      T.H(0, y + h - 1, VW, c('#4a2f1c'));   // 板と板のすき間・面の光
+      y += h; row++;
+    }
+    // 机の脚（左右）と床に落ちる影
+    const lw = Math.max(3, Math.round(VW * 0.035));
+    [[2, 1], [VW - 2 - lw, -1]].forEach(([x]) => {
+      T.R(x, y0 + ap, lw, fy + 2 - y0 - ap, c('#5a4030')); T.V(x, y0 + ap, fy + 2 - y0 - ap, c('#7a5a40'));
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 1, fy + 2, lw + 3, 2);
+    });
+    // 椅子の背（手前・まんなか少し右。画面の邪魔にならない低さ）
+    const cw = Math.round(F.w * 0.42), cx = Math.round(F.x + F.w / 2 + F.w * 0.06 - cw / 2), ct = y0 + Math.round(H * 0.42);
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(cx + 3, ct + 4, cw, VH - ct);
+    g.fillStyle = grad(ct, VH, '#3a3e4a', '#262932');
+    g.beginPath(); const r = Math.min(8, cw * 0.25);
+    g.moveTo(cx, VH); g.lineTo(cx, ct + r); g.quadraticCurveTo(cx, ct, cx + r, ct); g.lineTo(cx + cw - r, ct); g.quadraticCurveTo(cx + cw, ct, cx + cw, ct + r); g.lineTo(cx + cw, VH); g.closePath(); g.fill();
+    T.H(cx + r, ct, cw - r * 2, c('#5a5f6e')); T.V(cx, ct + r, VH - ct - r, c('#4a4e5a'));
+    T.V(cx + Math.round(cw / 2), ct + 4, VH - ct - 4, c('#22252c'));                // 背の縫い目
+  }
+
   /* ---------- パソコン ---------- */
   function drawPC(T, c, VW, VH, F, env, port) {
     const b = 3, tb = 6, standH = Math.max(5, Math.round(F.h * 0.12)), deskY = F.y + F.h + b + standH;
@@ -300,6 +342,7 @@
     T.R(0, deskY, VW, surf, c('#a87c52')); T.H(0, deskY, VW, c('#c8996a')); T.H(0, deskY + 1, VW, c('#b88a5c'));
     for (let y = deskY + 4; y < deskY + surf - 2; y += 5) for (let x = (y * 7) % 17; x < VW; x += 29) T.H(x, y, 9, c('#9a7048'));
     T.R(0, deskY + surf, VW, 3, c('#8a6040')); T.H(0, deskY + surf + 3, VW, c('#3e2e22'));
+    if (port) underDesk(T, c, VW, VH, deskY + surf + 4, F);
     // 台
     const cx = F.x + Math.round(F.w / 2), sw = Math.max(4, Math.round(F.w * 0.05));
     T.R(cx - sw / 2, F.y + F.h + b, sw, standH + 1, c('#3a3c44')); T.V(cx - sw / 2, F.y + F.h + b, standH, c('#50525c'));

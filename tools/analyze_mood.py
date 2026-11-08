@@ -87,6 +87,13 @@ MOODS = [  # 明るさ × 勢い
     ('monoomoi', 'もの思い', '暗めで、ほどよく動く'),
     ('hageshii', 'はげしい', '暗めで、勢いがある'),
 ]
+FIX = {  # id: 気分  （2026-11 本人と確認）
+    'tendre': 'hogaraka',    # やさしい花
+    'douce': 'monoomoi',     # 甘い嘆き
+    'sicilienne': 'monoomoi',  # シシリエンヌ（ギター）
+    'anitra': 'monoomoi',    # アニトラの踊り
+    'bwv999': 'monoomoi',    # 前奏曲 ハ短調 BWV999
+}
 def main():
     songs = load('music.js', 'CHILL_MUSIC') + load('music-cc.js', 'CHILL_MUSIC_CC') + load('music-mine.js', 'CHILL_MUSIC_MINE')
     F = {p['id']: features(dec(p['n']), jp=p.get('i') == 'koto') for p in songs}
@@ -106,6 +113,9 @@ def main():
     for k, o in out.items():
         lvl = 0 if o['e'] < lo else 1 if o['e'] < hi else 2
         o['m'] = MOODS[(0 if o['v'] >= 0 else 3) + lvl][0]
+    # 自動判定が聞いた感じとずれる曲の手直し（moods.js を手で直すと再生成で消えるのでここに書く）
+    for k, m in FIX.items():
+        if k in out: out[k]['m'] = m
     js = ('/* とおくの窓：曲の気分。tools/analyze_mood.py が音符データから自動で出したもの（v：明るさ、e：勢い、m：気分）。 */\n'
           'window.CHILL_MOODS = ' + json.dumps([dict(id=m[0], name=m[1], help=m[2]) for m in MOODS], ensure_ascii=False) + ';\n'
           'window.CHILL_MOOD_OF = ' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';\n')

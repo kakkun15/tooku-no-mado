@@ -965,5 +965,58 @@ window.CHILL_NOTES = {
 "src": [
 "https://en.wikipedia.org/wiki/Prelude_in_C_minor,_BWV_999"
 ]
+},
+"moment3": {
+"f": [
+"シューベルトが生きていたころから人気があり、「ロシアの歌（エール・リュス）」の名で知られていました。",
+"NHKのラジオ番組「音楽の泉」のテーマや、常磐線いわき駅の発車メロディーに使われています。"
+],
+"src": [
+"https://ja.wikipedia.org/wiki/楽興の時_(シューベルト)"
+]
+},
+"wiegenlied_s": {
+"f": [
+"1816年11月に作られた歌曲です。",
+"詞はマティアス・クラウディウスのものとされることもありますが、彼の作品集には入っていません。"
+],
+"src": [
+"https://en.wikipedia.org/wiki/Wiegenlied,_D_498_(Schubert)"
+]
+},
+"waltz15": {
+"f": [
+"16曲のワルツ集のなかで、たぶんいちばん人気のある曲です。",
+"ワルツ集は、音楽評論家のエドゥアルト・ハンスリックにささげられました。"
+],
+"src": [
+"https://en.wikipedia.org/wiki/Sixteen_Waltzes,_Op._39_(Brahms)"
+]
+},
+"sunflower": {
+"f": [
+"スコット・ジョプリンとスコット・ヘイデンの合作です。",
+"出版社は「メイプル・リーフ・ラグのふたごの妹」と宣伝しました。"
+],
+"src": [
+"https://en.wikipedia.org/wiki/Sunflower_Slow_Drag"
+]
+},
+"apres": {
+"f": [
+"もとは作者不明のイタリアの詩で、ロマン・ビュシーヌがフランス語に自由に直しました。",
+"フォーレの歌のなかでも、特に人気のある1曲です。"
+],
+"src": [
+"https://en.wikipedia.org/wiki/Trois_mélodies,_Op._7_(Fauré)"
+]
+},
+"slumber": {
+"f": [
+"1862年に、出版社ホレス・ウォーターズから出版されました。"
+],
+"src": [
+"https://en.wikipedia.org/wiki/List_of_songs_written_by_Stephen_Foster"
+]
 }
 };

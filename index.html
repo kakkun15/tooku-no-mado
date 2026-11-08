@@ -88,6 +88,13 @@
   <div class="gadd" id="gAdd"><p class="muted" id="gAddHelp" style="margin:0 0 6px"></p><div class="seg" id="gAddBtns"></div><div class="min">分で <input class="txt" type="number" inputmode="numeric" min="1" step="1" id="gAddMin" placeholder="45"> 分 <button class="btn2" id="gAddGo">足す</button></div></div>
   <div class="ggrid" id="gGrid"></div>
   <div class="glist" id="gList"></div>
+  <button class="gaddT" id="gIoT">記録を べつの端末へ（書き出す・読み込む）</button>
+  <div class="gadd" id="gIo">
+    <p class="muted" style="margin:0 0 6px">書き出すと、読める文になってコピーされます。メモ帳などに貼っておいて、べつの端末でここに貼って読み込みます。読み込んでも今の記録は消えず、合わさります。</p>
+    <div class="seg"><button id="gExp">書き出してコピー</button></div>
+    <textarea class="txt gio" id="gIoTxt" rows="5" placeholder="ここに記録の文を貼る"></textarea>
+    <div class="min"><button class="btn2" id="gImp">貼った記録を読み込む</button> <span id="gIoMsg"></span></div>
+  </div>
   <p class="muted">がんばったかどうかは、自分で決めてください。押したまま休んでも、寝落ちしても大丈夫です。気になったら、あとから「直す」で減らせます（直さなくてもかまいません）。<br>記録はこの端末のブラウザだけに残ります。日付の区切りは朝4時です。</p>
 </div>
 <!-- 小話を話す小鳥 -->
