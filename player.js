@@ -155,15 +155,17 @@
     const c = S.cur; if (!c || !c.wav) return;
     const isCur = el.src === c.url, pos = el.currentTime || 0, wasPlaying = isCur && !el.paused;
     const u = wavUrl(c.wav); release(c); c.url = u;
-    if (!isCur) return;
+    if (!isCur) { liveStop(); return; }
     swapping = true; el.src = u;
     el.addEventListener('loadedmetadata', () => {
-      try { el.currentTime = pos; } catch (e) {}
+      const live = LIVE.src && LIVE.item === c;
+      try { el.currentTime = live ? livePos() : pos; } catch (e) {}
+      if (live) { el.addEventListener('playing', liveStop, { once: true }); setTimeout(() => { if (!el.paused) liveStop(); }, 1500); } else liveStop();
       if (wasPlaying) { const r = el.play(); if (r && r.catch) r.catch(() => {}); }
       setTimeout(() => { swapping = false; }, 300);
     }, { once: true });
   }
-  function stopSource() { if (S.src) { try { S.src.onended = null; S.src.stop(); } catch (e) {} S.src = null; } }
+  function stopSource() { if (LIVE.src) liveStop(); if (S.src) { try { S.src.onended = null; S.src.stop(); } catch (e) {} S.src = null; } }
   function startCurrent(offset) {
     const c = S.cur; if (!c) return;
     offset = Math.max(0, Math.min(offset || 0, c.dur - 0.5));
@@ -232,7 +234,7 @@
   function pause() {
     if (!S.cur) return;
     S.offset = position(); S.playing = false;
-    if (S.cur.bg) el.pause(); else stopSource();
+    if (S.cur.bg) { el.pause(); liveStop(); } else stopSource();
     emit();
   }
   function toggle() { if (S.follow) return followToggle(); S.playing ? pause() : play(); }
@@ -257,7 +259,29 @@
   P.on('calm', () => { if (S.follow) return; if (S.next && DARK.has(S.next.piece.id)) { release(S.next); S.next = null; prefetch(); } if (S.cur && DARK.has(S.cur.piece.id)) { const ratio = position() / Math.max(1, S.cur.dur); playId(S.cur.piece.id, undefined, d => ratio * d, !S.playing); } });
   P.on('mode', () => { applyVolumes(); unlock(); rebuild(true); });
   let volT = 0;
-  P.on('vol', () => { applyVolumes(); if (FIXED_VOL && P.get('mode') === 'bg') { clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 350); } });
+  /* バックグラウンド再生（iPhone・iPad）で音量を動かしている間だけ、今の曲を Web Audio で鳴らして音量をすぐ反映する。
+     audio 要素は消音で流し続け、指を離したら音量を掛けた WAV に入れ替えて、Web Audio の位置に合わせて戻す */
+  const LIVE = { src: null, gain: null, at: 0, off: 0, item: null };
+  const livePos = () => LIVE.off + (ac.currentTime - LIVE.at);
+  function liveStart() {
+    const c = S.cur; if (LIVE.src || !c || !c.wav || !S.playing || el.paused || document.hidden) return;
+    ensureAC(); if (ac.state !== 'running') return;
+    if (!c.liveBuf) { const src = new Int16Array(c.wav, 44), b = ac.createBuffer(1, src.length, new DataView(c.wav).getUint32(24, true)), d = b.getChannelData(0); for (let i = 0; i < src.length; i++) d[i] = src[i] / 32768; c.liveBuf = b; }
+    if (!LIVE.gain) { LIVE.gain = ac.createGain(); LIVE.gain.connect(master); }
+    LIVE.gain.gain.value = Math.min(1, P.get('vol') / 100);
+    const x = ac.createBufferSource(); x.buffer = c.liveBuf; x.connect(LIVE.gain);
+    LIVE.off = el.currentTime || 0; LIVE.at = ac.currentTime; x.start(0, LIVE.off);
+    LIVE.src = x; LIVE.item = c; el.muted = true;
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && LIVE.src) liveStop(); });   // 隠れると Web Audio は止まるので、audio 要素の音に戻す
+  function liveStop() { if (LIVE.src) { try { LIVE.src.stop(); } catch (e) {} LIVE.src = null; } LIVE.item = null; el.muted = false; }
+  P.on('vol', () => {
+    applyVolumes();
+    if (!(FIXED_VOL && P.get('mode') === 'bg')) return;
+    liveStart();
+    if (LIVE.src && LIVE.gain) { const t = ac.currentTime, g = LIVE.gain.gain; try { g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(Math.min(1, P.get('vol') / 100), t + 0.03); } catch (e) { g.value = Math.min(1, P.get('vol') / 100); } }
+    clearTimeout(volT); volT = setTimeout(reapplyBgVolume, 600);
+  });
   P.on('amb', applyVolumes);
   P.on('moods', () => { if (S.next && !allowed(S.next.piece)) { release(S.next); S.next = null; prefetch(); } });
   P.on('cc', v => {
@@ -391,7 +415,7 @@
 
   window.TookuPlayer = {
     syncState, follow, unfollow, get following() { return !!S.follow; },
-    sample,
+    sample, _live: () => ({ live: !!LIVE.src, muted: el.muted, t: el.currentTime }),   // 確かめ用
     PIECES, DARK, FAMILY_NAME, GROUP_NAME, moodOf, LICENSES: window.CHILL_LICENSES || {}, allowed, enabledIds, state, play, pause, toggle, skip, prev, playPiece, unlock,
     on: f => { listeners.add(f); return () => listeners.delete(f); },
     setAmbience: kinds => { if (ac) setAmbience(kinds); else AMB.pending = kinds; },
