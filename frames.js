@@ -279,7 +279,7 @@
     return {};
   }
 
-  /* 縦長のパソコン：机の下（幕板・奥の暗がり・机の脚・床の板・椅子の背） */
+  /* 縦長のパソコン：机の下（幕板・奥の暗がり・机の脚・床の板）。椅子は正面の机と角度が合わず分かりにくいので置かない（11/9 本人と相談） */
   function underDesk(T, c, VW, VH, y0, F) {
     const H = VH - y0; if (H < 16) return;
     const g = T.g, grad = (y1, y2, a, b) => { const gr = g.createLinearGradient(0, y1, 0, y2); gr.addColorStop(0, c(a)); gr.addColorStop(1, c(b)); return gr; };
@@ -312,14 +312,6 @@
       T.R(x, y0 + ap, lw, fy + 2 - y0 - ap, c('#5a4030')); T.V(x, y0 + ap, fy + 2 - y0 - ap, c('#7a5a40'));
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 1, fy + 2, lw + 3, 2);
     });
-    // 椅子の背（手前・まんなか少し右。画面の邪魔にならない低さ）
-    const cw = Math.round(F.w * 0.42), cx = Math.round(F.x + F.w / 2 + F.w * 0.06 - cw / 2), ct = y0 + Math.round(H * 0.42);
-    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(cx + 3, ct + 4, cw, VH - ct);
-    g.fillStyle = grad(ct, VH, '#3a3e4a', '#262932');
-    g.beginPath(); const r = Math.min(8, cw * 0.25);
-    g.moveTo(cx, VH); g.lineTo(cx, ct + r); g.quadraticCurveTo(cx, ct, cx + r, ct); g.lineTo(cx + cw - r, ct); g.quadraticCurveTo(cx + cw, ct, cx + cw, ct + r); g.lineTo(cx + cw, VH); g.closePath(); g.fill();
-    T.H(cx + r, ct, cw - r * 2, c('#5a5f6e')); T.V(cx, ct + r, VH - ct - r, c('#4a4e5a'));
-    T.V(cx + Math.round(cw / 2), ct + 4, VH - ct - 4, c('#22252c'));                // 背の縫い目
   }
 
   /* ---------- パソコン ---------- */
